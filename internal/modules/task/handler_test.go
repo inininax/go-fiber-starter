@@ -4,16 +4,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/glebarez/sqlite"
 	"github.com/gofiber/fiber/v3"
 	"gorm.io/gorm"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
+	"go-fiber-starter/internal/httpx"
+	"go-fiber-starter/internal/testutil"
 	"go-fiber-starter/internal/validator"
 )
 
@@ -32,8 +32,8 @@ func newTestApp(t *testing.T) *fiber.App {
 
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c fiber.Ctx, err error) error {
-			appErr := common.AsAppError(err)
-			return c.Status(appErr.Status).JSON(common.ErrorBody(appErr))
+			appErr := apperror.AsAppError(err)
+			return c.Status(appErr.Status).JSON(httpx.ErrorBody(appErr))
 		},
 		StructValidator: validator.NewFiberStructValidator(),
 	})
@@ -41,44 +41,9 @@ func newTestApp(t *testing.T) *fiber.App {
 	return app
 }
 
-type apiError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-type apiEnvelope struct {
-	Success bool            `json:"success"`
-	Data    json.RawMessage `json:"data"`
-	Meta    json.RawMessage `json:"meta"`
-	Error   *apiError       `json:"error"`
-}
-
-func do(t *testing.T, app *fiber.App, method, target, body string) (*http.Response, apiEnvelope) {
-	t.Helper()
-	var req *http.Request
-	if body != "" {
-		req = httptest.NewRequest(method, target, strings.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-	} else {
-		req = httptest.NewRequest(method, target, nil)
-	}
-	resp, err := app.Test(req)
-	if err != nil {
-		t.Fatalf("%s %s: %v", method, target, err)
-	}
-	var env apiEnvelope
-	// 204 등 본문 없는 응답을 허용한다.
-	if resp.StatusCode != http.StatusNoContent && resp.ContentLength != 0 {
-		if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
-			t.Fatalf("decode response: %v", err)
-		}
-	}
-	return resp, env
-}
-
 func TestHandler_Create_Returns201AndEnvelope(t *testing.T) {
 	app := newTestApp(t)
-	resp, env := do(t, app, http.MethodPost, "/api/v1/tasks", `{"title":"write tests"}`)
+	resp, env := testutil.Do(t, app, http.MethodPost, "/api/v1/tasks", `{"title":"write tests"}`, "")
 
 	if resp.StatusCode != http.StatusCreated {
 		t.Fatalf("want 201, got %d (%+v)", resp.StatusCode, env)
@@ -97,7 +62,7 @@ func TestHandler_Create_Returns201AndEnvelope(t *testing.T) {
 
 func TestHandler_Create_ValidationFails_422WithDetails(t *testing.T) {
 	app := newTestApp(t)
-	resp, env := do(t, app, http.MethodPost, "/api/v1/tasks", `{"title":""}`)
+	resp, env := testutil.Do(t, app, http.MethodPost, "/api/v1/tasks", `{"title":""}`, "")
 
 	if resp.StatusCode != http.StatusUnprocessableEntity {
 		t.Fatalf("want 422, got %d", resp.StatusCode)
@@ -109,7 +74,7 @@ func TestHandler_Create_ValidationFails_422WithDetails(t *testing.T) {
 
 func TestHandler_Create_MalformedBody_400(t *testing.T) {
 	app := newTestApp(t)
-	resp, env := do(t, app, http.MethodPost, "/api/v1/tasks", `{not-json`)
+	resp, env := testutil.Do(t, app, http.MethodPost, "/api/v1/tasks", `{not-json`, "")
 
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("want 400, got %d (%+v)", resp.StatusCode, env)
@@ -120,12 +85,12 @@ func TestHandler_List_ReturnsMeta(t *testing.T) {
 	app := newTestApp(t)
 	for i := range 3 {
 		body := fmt.Sprintf(`{"title":"task-%d"}`, i)
-		if resp, _ := do(t, app, http.MethodPost, "/api/v1/tasks", body); resp.StatusCode != http.StatusCreated {
+		if resp, _ := testutil.Do(t, app, http.MethodPost, "/api/v1/tasks", body, ""); resp.StatusCode != http.StatusCreated {
 			t.Fatalf("seed create failed: %d", resp.StatusCode)
 		}
 	}
 
-	resp, env := do(t, app, http.MethodGet, "/api/v1/tasks?page=1&limit=2", "")
+	resp, env := testutil.Do(t, app, http.MethodGet, "/api/v1/tasks?page=1&limit=2", "", "")
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("want 200, got %d", resp.StatusCode)
 	}
@@ -152,24 +117,24 @@ func TestHandler_List_ReturnsMeta(t *testing.T) {
 
 func TestHandler_Get_NotFound_EnvelopeCode(t *testing.T) {
 	app := newTestApp(t)
-	resp, env := do(t, app, http.MethodGet, "/api/v1/tasks/999", "")
+	resp, env := testutil.Do(t, app, http.MethodGet, "/api/v1/tasks/999", "", "")
 
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("want 404, got %d", resp.StatusCode)
 	}
-	if env.Error == nil || env.Error.Code != common.CodeTaskNotFound {
+	if env.Error == nil || env.Error.Code != CodeTaskNotFound {
 		t.Fatalf("expected TASK_NOT_FOUND code, got %+v", env.Error)
 	}
 }
 
 func TestHandler_Update_PartialPatch(t *testing.T) {
 	app := newTestApp(t)
-	_, createdEnv := do(t, app, http.MethodPost, "/api/v1/tasks", `{"title":"keep me"}`)
+	_, createdEnv := testutil.Do(t, app, http.MethodPost, "/api/v1/tasks", `{"title":"keep me"}`, "")
 	var createdData Response
 	_ = json.Unmarshal(createdEnv.Data, &createdData)
 
 	url := fmt.Sprintf("/api/v1/tasks/%d", createdData.ID)
-	resp, env := do(t, app, http.MethodPatch, url, `{"done":true}`)
+	resp, env := testutil.Do(t, app, http.MethodPatch, url, `{"done":true}`, "")
 
 	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("want 200, got %d (%+v)", resp.StatusCode, env)
@@ -185,24 +150,24 @@ func TestHandler_Update_PartialPatch(t *testing.T) {
 
 func TestHandler_Delete_204Then404(t *testing.T) {
 	app := newTestApp(t)
-	_, createdEnv := do(t, app, http.MethodPost, "/api/v1/tasks", `{"title":"temp"}`)
+	_, createdEnv := testutil.Do(t, app, http.MethodPost, "/api/v1/tasks", `{"title":"temp"}`, "")
 	var data Response
 	_ = json.Unmarshal(createdEnv.Data, &data)
 
 	url := fmt.Sprintf("/api/v1/tasks/%d", data.ID)
-	resp, _ := do(t, app, http.MethodDelete, url, "")
+	resp, _ := testutil.Do(t, app, http.MethodDelete, url, "", "")
 	if resp.StatusCode != http.StatusNoContent {
 		t.Fatalf("want 204, got %d", resp.StatusCode)
 	}
-	resp, env := do(t, app, http.MethodGet, url, "")
-	if resp.StatusCode != http.StatusNotFound || env.Error.Code != common.CodeTaskNotFound {
+	resp, env := testutil.Do(t, app, http.MethodGet, url, "", "")
+	if resp.StatusCode != http.StatusNotFound || env.Error.Code != CodeTaskNotFound {
 		t.Fatalf("want 404 TASK_NOT_FOUND after delete, got %d %+v", resp.StatusCode, env.Error)
 	}
 }
 
 func TestHandler_BadIDParam_400(t *testing.T) {
 	app := newTestApp(t)
-	resp, env := do(t, app, http.MethodGet, "/api/v1/tasks/abc", "")
+	resp, env := testutil.Do(t, app, http.MethodGet, "/api/v1/tasks/abc", "", "")
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("want 400, got %d (%+v)", resp.StatusCode, env)
 	}

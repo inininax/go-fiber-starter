@@ -5,7 +5,9 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
+	"go-fiber-starter/internal/httpx"
+	"go-fiber-starter/internal/pagination"
 	"go-fiber-starter/internal/validator"
 )
 
@@ -21,25 +23,25 @@ func NewHandler(svc *Service) *Handler {
 func (h *Handler) Create(c fiber.Ctx) error {
 	var req CreateRequest
 	if err := c.Bind().Body(&req); err != nil {
-		return bindErrorToAppError(err)
+		return validator.BindErrorToAppError(err)
 	}
 	res, err := h.svc.Create(c.Context(), req)
 	if err != nil {
 		return err
 	}
-	return common.Created(c, res)
+	return httpx.Created(c, res)
 }
 
 // List는 GET /api/v1/tasks?page=&limit=
 func (h *Handler) List(c fiber.Ctx) error {
-	page := atoiDefault(c.Query("page"), common.DefaultPage)
-	limit := atoiDefault(c.Query("limit"), common.DefaultLimit)
+	page := atoiDefault(c.Query("page"), pagination.DefaultPage)
+	limit := atoiDefault(c.Query("limit"), pagination.DefaultLimit)
 
 	items, meta, err := h.svc.List(c.Context(), page, limit)
 	if err != nil {
 		return err
 	}
-	return common.OKWithMeta(c, items, meta)
+	return httpx.OKWithMeta(c, items, meta)
 }
 
 // Get은 GET /api/v1/tasks/:id
@@ -52,7 +54,7 @@ func (h *Handler) Get(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return common.OK(c, res)
+	return httpx.OK(c, res)
 }
 
 // Update는 PATCH /api/v1/tasks/:id (부분 수정)
@@ -63,13 +65,13 @@ func (h *Handler) Update(c fiber.Ctx) error {
 	}
 	var req UpdateRequest
 	if err := c.Bind().Body(&req); err != nil {
-		return bindErrorToAppError(err)
+		return validator.BindErrorToAppError(err)
 	}
 	res, err := h.svc.Update(c.Context(), id, req)
 	if err != nil {
 		return err
 	}
-	return common.OK(c, res)
+	return httpx.OK(c, res)
 }
 
 // Delete는 DELETE /api/v1/tasks/:id
@@ -81,13 +83,13 @@ func (h *Handler) Delete(c fiber.Ctx) error {
 	if err := h.svc.Delete(c.Context(), id); err != nil {
 		return err
 	}
-	return common.NoContent(c)
+	return httpx.NoContent(c)
 }
 
 func parseID(raw string) (uint, error) {
 	id, err := strconv.ParseUint(raw, 10, 64)
 	if err != nil || id == 0 {
-		return 0, common.NewBadRequest("path parameter 'id' must be a positive integer")
+		return 0, apperror.NewBadRequest("path parameter 'id' must be a positive integer")
 	}
 	return uint(id), nil
 }
@@ -98,9 +100,4 @@ func atoiDefault(raw string, def int) int {
 		return def
 	}
 	return n
-}
-
-// bindErrorToAppError는 validator.BindErrorToAppError로 위임한다 (공용 계약 유지).
-func bindErrorToAppError(err error) *common.AppError {
-	return validator.BindErrorToAppError(err)
 }

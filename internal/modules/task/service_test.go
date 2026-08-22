@@ -6,7 +6,8 @@ import (
 	"sync"
 	"testing"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
+	"go-fiber-starter/internal/pagination"
 )
 
 // fakeRepo는 Repository 인터페이스의 인메모리 대역이다(외부 I/O 없음).
@@ -35,13 +36,13 @@ func (f *fakeRepo) FindByID(_ context.Context, id uint) (*Task, error) {
 	defer f.mu.Unlock()
 	t, ok := f.tasks[id]
 	if !ok {
-		return nil, common.ErrTaskNotFound
+		return nil, ErrTaskNotFound
 	}
 	cp := *t
 	return &cp, nil
 }
 
-func (f *fakeRepo) List(_ context.Context, q common.PageQuery) ([]Task, int64, error) {
+func (f *fakeRepo) List(_ context.Context, q pagination.PageQuery) ([]Task, int64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	out := make([]Task, 0, len(f.tasks))
@@ -56,7 +57,7 @@ func (f *fakeRepo) Update(_ context.Context, id uint, mutate func(*Task)) (*Task
 	defer f.mu.Unlock()
 	t, ok := f.tasks[id]
 	if !ok {
-		return nil, common.ErrNotFound
+		return nil, apperror.ErrNotFound
 	}
 	mutate(t)
 	return t, nil
@@ -66,7 +67,7 @@ func (f *fakeRepo) Delete(_ context.Context, id uint) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if _, ok := f.tasks[id]; !ok {
-		return common.ErrTaskNotFound
+		return ErrTaskNotFound
 	}
 	delete(f.tasks, id)
 	return nil
@@ -90,7 +91,7 @@ func TestService_Create(t *testing.T) {
 func TestService_Get_NotFound(t *testing.T) {
 	svc := newTestService()
 	_, err := svc.Get(context.Background(), 999)
-	if !errors.Is(err, common.ErrTaskNotFound) {
+	if !errors.Is(err, ErrTaskNotFound) {
 		t.Fatalf("want ErrTaskNotFound, got %v", err)
 	}
 }
@@ -116,21 +117,21 @@ func TestService_Update_NotFound(t *testing.T) {
 	svc := newTestService()
 	title := "x"
 	_, err := svc.Update(context.Background(), 42, UpdateRequest{Title: &title})
-	if !errors.Is(err, common.ErrTaskNotFound) {
+	if !errors.Is(err, ErrTaskNotFound) {
 		t.Fatalf("want ErrTaskNotFound, got %v", err)
 	}
 }
 
 func TestService_Delete_NotFound(t *testing.T) {
 	svc := newTestService()
-	if err := svc.Delete(context.Background(), 7); !errors.Is(err, common.ErrTaskNotFound) {
+	if err := svc.Delete(context.Background(), 7); !errors.Is(err, ErrTaskNotFound) {
 		t.Fatalf("want ErrTaskNotFound, got %v", err)
 	}
 }
 
 func TestService_List_ClampsLimit(t *testing.T) {
-	q := common.NewPageQuery(1, 1000)
-	if q.Limit != common.MaxLimit {
-		t.Fatalf("limit must be clamped to %d, got %d", common.MaxLimit, q.Limit)
+	q := pagination.NewPageQuery(1, 1000)
+	if q.Limit != pagination.MaxLimit {
+		t.Fatalf("limit must be clamped to %d, got %d", pagination.MaxLimit, q.Limit)
 	}
 }

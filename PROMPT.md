@@ -58,10 +58,9 @@ go-fiber-starter/
 │   │   ├── requestlogger.go     # method/path/status/latency/request_id 구조화 로그
 │   │   ├── prometheus.go        # 요청 카운터/히스토그램 수집
 │   │   └── clock.go             # 시계 주입(테스트 대체용)
-│   ├── common/
-│   │   ├── errors.go            # AppError 타입 + 에러 코드 카탈로그
-│   │   ├── response.go          # 성공/실패 엔벨로프 헬퍼
-│   │   └── pagination.go        # 페이지네이션 파라미터/meta(MaxLimit 클램프)
+│   ├── apperror/errors.go        # AppError 타입 + 범용 에러 코드 카탈로그
+│   ├── httpx/response.go         # 성공/실패 엔벨로프 헬퍼
+│   └── pagination/pagination.go  # 페이지네이션 파라미터/meta(MaxLimit 클램프)
 │   ├── validator/validator.go   # go-playground ↔ Fiber StructValidator 연결
 │   ├── router/
 │   │   ├── router.go            # fiber.App 생성, 미들웨어 체인, ErrorHandler
@@ -69,7 +68,7 @@ go-fiber-starter/
 │   │   └── wiring.go            # 모듈별 service/repository 조립
 │   └── modules/
 │       ├── task/                # 예제 도메인 = "새 모듈 추가 템플릿"
-│       │   ├── model.go  dto.go  repository.go  service.go  handler.go  routes.go
+│       │   ├── model.go  dto.go  errors.go  repository.go  service.go  handler.go  routes.go
 │       │   ├── service_test.go      # fake repo 단위 테스트
 │       │   └── handler_test.go      # sqlite 파일 + app.Test 통합 테스트
 │       └── health/handler.go    # livez/readyz
@@ -140,7 +139,8 @@ requestid → recover → helmet(보안헤더) → cors(설정 기반) → rate 
                              }
                            }
 ```
-- `common.AppError{Code, Status, Message, Details}` + 생성자(`NewNotFound` 등).
+- `apperror.AppError{Code, Status, Message, Details}` + 생성자(`NewBadRequest`/`NewValidation`).
+  도메인 전용 센티널(예: TASK_NOT_FOUND)은 해당 모듈 `errors.go`에 선언한다.
 - **에러 코드 카탈로그** 상수화: `INVALID_REQUEST(422)`, `NOT_FOUND(404)`, `CONFLICT(409)`,
   `INTERNAL_ERROR(500)`, `TASK_NOT_FOUND(404)` …
 - service/repository는 `fmt.Errorf("...: %w", ErrNotFound)` 래핑. router의 전역 `ErrorHandler`에서
@@ -189,7 +189,7 @@ requestid → recover → helmet(보안헤더) → cors(설정 기반) → rate 
 8. 신규 모듈 추가 가이드대로 따라했을 때 task 모듈과 동일한 구조가 나옴.
 
 ## 7. 진행 순서
-1. 스켈레톤(go.mod, 디렉터리) → 2. config → 3. common(errors/response/pagination) →
+1. 스켈레톤(go.mod, 디렉터리) → 2. config → 3. apperror/httpx/pagination(순수 패키지) →
 4. database(+logger) → 5. middleware → 6. task 모듈(model→repo→service→handler→routes) →
 7. health 모듈 → 8. router(ErrorHandler 포함) → 9. main(graceful shutdown) →
 10. 마이그레이션(cmd/migrate + SQL) → 11. 테스트 → 12. 도구/CI/문서 → 13. DoD 검증.

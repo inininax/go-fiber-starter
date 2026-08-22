@@ -1,4 +1,4 @@
-package common
+package apperror
 
 import (
 	"errors"
@@ -14,8 +14,6 @@ const (
 	CodeInternal          = "INTERNAL_ERROR"
 	CodeUnauthorized      = "UNAUTHORIZED"
 	CodeInvalidCredential = "INVALID_CREDENTIALS"
-
-	CodeTaskNotFound = "TASK_NOT_FOUND"
 )
 
 // AppError는 도메인/전송 계층에서 사용하는 비즈니스 에러다.
@@ -44,7 +42,7 @@ func (e *AppError) Error() string {
 func (e *AppError) Unwrap() error { return e.err }
 
 // Is는 코드 기반 동등성을 제공한다. WithCause로 복사된 인스턴스도
-// errors.Is(err, common.ErrXxx) 매칭이 되도록 한다.
+// errors.Is(err, apperror.ErrXxx) 매칭이 되도록 한다.
 func (e *AppError) Is(target error) bool {
 	t, ok := target.(*AppError)
 	if !ok {
@@ -68,8 +66,6 @@ var (
 
 	ErrUnauthorized      = &AppError{Code: CodeUnauthorized, Status: http.StatusUnauthorized, Message: "authentication required"}
 	ErrInvalidCredential = &AppError{Code: CodeInvalidCredential, Status: http.StatusUnauthorized, Message: "invalid username or password"}
-
-	ErrTaskNotFound = (&AppError{Code: CodeTaskNotFound, Status: http.StatusNotFound, Message: "task not found"})
 )
 
 func NewBadRequest(msg string, details ...Detail) *AppError {

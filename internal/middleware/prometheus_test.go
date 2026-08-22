@@ -7,7 +7,8 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
+	"go-fiber-starter/internal/httpx"
 )
 
 // TestPrometheus_HandlerError_CountedWithRealStatus는 핸들러가 에러를 반환해도
@@ -19,13 +20,13 @@ func TestPrometheus_HandlerError_CountedWithRealStatus(t *testing.T) {
 
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c fiber.Ctx, err error) error {
-			appErr := common.AsAppError(err)
-			return c.Status(appErr.Status).JSON(common.ErrorBody(appErr))
+			appErr := apperror.AsAppError(err)
+			return c.Status(appErr.Status).JSON(httpx.ErrorBody(appErr))
 		},
 	})
 	app.Use(p.Handler())
 	app.Get("/forced", func(c fiber.Ctx) error {
-		return common.NewValidation(nil)
+		return apperror.NewValidation(nil)
 	})
 
 	req := httptest.NewRequest("GET", "/forced", nil)

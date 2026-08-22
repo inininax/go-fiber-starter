@@ -9,7 +9,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
 	"go-fiber-starter/internal/config"
 )
 
@@ -39,7 +39,7 @@ func (d *demoAuthenticator) Verify(_ context.Context, username, password string)
 	userOK := subtle.ConstantTimeCompare([]byte(username), []byte(d.username)) == 1
 	passOK := subtle.ConstantTimeCompare([]byte(password), []byte(d.password)) == 1
 	if !(userOK && passOK) {
-		return Identity{}, common.ErrInvalidCredential
+		return Identity{}, apperror.ErrInvalidCredential
 	}
 	return Identity{Username: username}, nil
 }
@@ -84,11 +84,11 @@ func (s *Service) Verify(tokenString string) (Identity, error) {
 		jwt.WithExpirationRequired(),
 	)
 	if err != nil {
-		return Identity{}, common.ErrUnauthorized.WithCause(fmt.Errorf("%w: %v", errInvalidToken, err))
+		return Identity{}, apperror.ErrUnauthorized.WithCause(fmt.Errorf("%w: %v", errInvalidToken, err))
 	}
 	claims, ok := parsed.Claims.(*jwt.RegisteredClaims)
 	if !ok || claims.Subject == "" {
-		return Identity{}, common.ErrUnauthorized.WithCause(errInvalidToken)
+		return Identity{}, apperror.ErrUnauthorized.WithCause(errInvalidToken)
 	}
 	return Identity{Username: claims.Subject}, nil
 }

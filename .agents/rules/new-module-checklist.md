@@ -13,8 +13,8 @@
 ## 2. 검증/에러 연결
 
 - [ ] 요청 DTO에 `validate:"..."` 태그 (StructValidator가 자동 실행)
-- [ ] 도메인 에러는 common.errors.go 카탈로그에 코드+상태 등록 후 service에서 반환
-- [ ] Bind 실패 매핑은 task/handler.go의 bindErrorToAppError 패턴 재사용
+- [ ] 도메인 에러는 `<name>/errors.go`에 apperror.AppError 센티널 정의(범용만 전역 카탈로그) 후 service에서 반환
+- [ ] Bind 실패 매핑은 `validator.BindErrorToAppError`를 그대로 사용(모듈별 재정의 금지)
 
 ## 3. 마이그레이션 이원화 (놓치기 쉬움 — 둘 다!)
 
@@ -33,7 +33,7 @@
 - [ ] service 단위 테스트: fake repository 주입, 외부 I/O 없음
 - [ ] handler 통합 테스트: 임시 디렉터리 sqlite + 실제 GORM + app.Test()
   - 성공/검증실패(422)/미존재(404) 시나리오 최소 3개
-  - 응답 디코딩은 빈 본문(204 등) 건너뛰는 do() 헬퍼 패턴 사용
+  - 응답 디코딩은 빈 본문(204 등) 건너뛰는 `testutil.Do` 헬퍼 사용
 - [ ] `gofmt -w . && go vet ./... && go test ./... -race` 통과
 
 ## 6. 문서

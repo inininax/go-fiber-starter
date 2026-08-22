@@ -11,7 +11,8 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
+	"go-fiber-starter/internal/httpx"
 )
 
 // localErrorHandler는 router.go 전역 ErrorHandler와 동일한 상태 매핑을 재현한다.
@@ -19,16 +20,16 @@ import (
 func localErrorHandler(c fiber.Ctx, err error) error {
 	var fe *fiber.Error
 	if errors.As(err, &fe) {
-		return c.Status(fe.Code).JSON(common.ErrorBody(common.ErrNotFound.WithCause(fe)))
+		return c.Status(fe.Code).JSON(httpx.ErrorBody(apperror.ErrNotFound.WithCause(fe)))
 	}
 
-	appErr := common.AsAppError(err)
+	appErr := apperror.AsAppError(err)
 	if appErr.Status >= 500 {
 		// 클라이언트에는 고정 메시지 500만 노출한다(router.go와 동일).
-		safe := *common.ErrInternal
-		return c.Status(safe.Status).JSON(common.ErrorBody(&safe))
+		safe := *apperror.ErrInternal
+		return c.Status(safe.Status).JSON(httpx.ErrorBody(&safe))
 	}
-	return c.Status(appErr.Status).JSON(common.ErrorBody(appErr))
+	return c.Status(appErr.Status).JSON(httpx.ErrorBody(appErr))
 }
 
 // statusVia는 핸들러가 반환한 에러를 언와인드 시점에 EffectiveStatus로 관측한다.
@@ -64,7 +65,7 @@ func TestEffectiveStatus_FiberError_UsesCode(t *testing.T) {
 }
 
 func TestEffectiveStatus_AppError_Wrapped_UsesStatus(t *testing.T) {
-	err := fmt.Errorf("wrap: %w", common.ErrTaskNotFound)
+	err := fmt.Errorf("wrap: %w", apperror.ErrNotFound)
 	got := statusVia(func(c fiber.Ctx) error { return err })
 	if got != http.StatusNotFound {
 		t.Fatalf("want 404, got %d", got)
@@ -80,7 +81,7 @@ func TestEffectiveStatus_UnknownError_Is500(t *testing.T) {
 
 // errorHandler는 >=500을 고정 500으로 응답하므로 관측값도 클램프돼야 한다.
 func TestEffectiveStatus_AppErrorAbove500_ClampsTo500(t *testing.T) {
-	err := fmt.Errorf("wrap: %w", &common.AppError{Code: "SERVICE_UNAVAILABLE", Status: 503, Message: "down"})
+	err := fmt.Errorf("wrap: %w", &apperror.AppError{Code: "SERVICE_UNAVAILABLE", Status: 503, Message: "down"})
 	got := statusVia(func(c fiber.Ctx) error { return err })
 	if got != http.StatusInternalServerError {
 		t.Fatalf("want clamped 500, got %d", got)
@@ -97,11 +98,11 @@ func TestEffectiveStatus_MatchesGlobalErrorHandler(t *testing.T) {
 		{"NilErrorWithSendStatus", func(c fiber.Ctx) error { return c.SendStatus(http.StatusServiceUnavailable) }},
 		{"FiberError", func(c fiber.Ctx) error { return fiber.NewError(fiber.StatusTeapot, "teapot") }},
 		{"WrappedAppError", func(c fiber.Ctx) error {
-			return fmt.Errorf("wrap: %w", common.ErrTaskNotFound)
+			return fmt.Errorf("wrap: %w", apperror.ErrNotFound)
 		}},
 		{"UnknownError", func(c fiber.Ctx) error { return errors.New("boom") }},
 		{"AppErrorAbove500", func(c fiber.Ctx) error {
-			return &common.AppError{Code: "SERVICE_UNAVAILABLE", Status: 503, Message: "down"}
+			return &apperror.AppError{Code: "SERVICE_UNAVAILABLE", Status: 503, Message: "down"}
 		}},
 	}
 

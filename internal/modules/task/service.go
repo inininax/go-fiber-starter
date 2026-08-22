@@ -5,7 +5,8 @@ import (
 	"errors"
 	"fmt"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
+	"go-fiber-starter/internal/pagination"
 )
 
 // Repository는 Service가 필요한 저장소 기능만 정의한 인터페이스다(소비자 정의).
@@ -13,7 +14,7 @@ import (
 type Repository interface {
 	Create(ctx context.Context, t *Task) error
 	FindByID(ctx context.Context, id uint) (*Task, error)
-	List(ctx context.Context, q common.PageQuery) ([]Task, int64, error)
+	List(ctx context.Context, q pagination.PageQuery) ([]Task, int64, error)
 	Update(ctx context.Context, id uint, mutate func(*Task)) (*Task, error)
 	Delete(ctx context.Context, id uint) error
 }
@@ -42,13 +43,13 @@ func (s *Service) Get(ctx context.Context, id uint) (Response, error) {
 	return toResponse(*t), nil
 }
 
-func (s *Service) List(ctx context.Context, page, limit int) ([]Response, common.PageMeta, error) {
-	q := common.NewPageQuery(page, limit)
+func (s *Service) List(ctx context.Context, page, limit int) ([]Response, pagination.PageMeta, error) {
+	q := pagination.NewPageQuery(page, limit)
 	tasks, total, err := s.repo.List(ctx, q)
 	if err != nil {
-		return nil, common.PageMeta{}, fmt.Errorf("list tasks: %w", err)
+		return nil, pagination.PageMeta{}, fmt.Errorf("list tasks: %w", err)
 	}
-	return toResponses(tasks), common.NewPageMeta(q, total), nil
+	return toResponses(tasks), pagination.NewPageMeta(q, total), nil
 }
 
 // Update는 present-field만 반영한다. nil 포인터 = 변경 없음.
@@ -66,8 +67,8 @@ func (s *Service) Update(ctx context.Context, id uint, req UpdateRequest) (Respo
 	}
 	t, err := s.repo.Update(ctx, id, mutate)
 	if err != nil {
-		if errors.Is(err, common.ErrNotFound) {
-			return Response{}, common.ErrTaskNotFound
+		if errors.Is(err, apperror.ErrNotFound) {
+			return Response{}, ErrTaskNotFound
 		}
 		return Response{}, fmt.Errorf("update task %d: %w", id, err)
 	}
@@ -77,8 +78,8 @@ func (s *Service) Update(ctx context.Context, id uint, req UpdateRequest) (Respo
 func (s *Service) Delete(ctx context.Context, id uint) error {
 	err := s.repo.Delete(ctx, id)
 	if err != nil {
-		if errors.Is(err, common.ErrNotFound) {
-			return common.ErrTaskNotFound
+		if errors.Is(err, apperror.ErrNotFound) {
+			return ErrTaskNotFound
 		}
 		return fmt.Errorf("delete task %d: %w", id, err)
 	}

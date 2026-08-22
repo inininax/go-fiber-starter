@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
 	"go-fiber-starter/internal/config"
 )
 
@@ -46,7 +46,7 @@ func TestIssueAndVerify_Roundtrip(t *testing.T) {
 func TestIssue_WrongPassword_InvalidCredentials(t *testing.T) {
 	svc := newTestService(testTTL)
 	_, _, err := svc.Issue(context.Background(), "admin", "wrong")
-	if !errors.Is(err, common.ErrInvalidCredential) {
+	if !errors.Is(err, apperror.ErrInvalidCredential) {
 		t.Fatalf("want ErrInvalidCredential, got %v", err)
 	}
 }
@@ -57,7 +57,7 @@ func TestVerify_ExpiredToken_Unauthorized(t *testing.T) {
 	if err != nil {
 		t.Fatalf("issue: %v", err)
 	}
-	if _, err := svc.Verify(token); !errors.Is(err, common.ErrUnauthorized) {
+	if _, err := svc.Verify(token); !errors.Is(err, apperror.ErrUnauthorized) {
 		t.Fatalf("want ErrUnauthorized for expired token, got %v", err)
 	}
 }
@@ -67,7 +67,7 @@ func TestVerify_TamperedToken_Unauthorized(t *testing.T) {
 	token, _, _ := svc.Issue(context.Background(), "admin", "admin123")
 
 	other := NewService(NewDemoAuthenticator(demoCfg()), "another-secret-0123456789abcdef-99", testTTL)
-	if _, err := other.Verify(token); !errors.Is(err, common.ErrUnauthorized) {
+	if _, err := other.Verify(token); !errors.Is(err, apperror.ErrUnauthorized) {
 		t.Fatalf("want ErrUnauthorized for foreign-secret token, got %v", err)
 	}
 }

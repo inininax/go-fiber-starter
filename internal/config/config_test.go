@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/pagination"
 )
 
 func validConfig() *Config {
@@ -177,14 +177,14 @@ func TestValidate_TrustProxyRules(t *testing.T) {
 }
 
 func TestNewPageQuery_ClampsLimit(t *testing.T) {
-	q := common.NewPageQuery(0, 500)
-	if q.Page != common.DefaultPage || q.Limit != common.MaxLimit {
-		t.Fatalf("want page=%d limit=%d, got %+v", common.DefaultPage, common.MaxLimit, q)
+	q := pagination.NewPageQuery(0, 500)
+	if q.Page != pagination.DefaultPage || q.Limit != pagination.MaxLimit {
+		t.Fatalf("want page=%d limit=%d, got %+v", pagination.DefaultPage, pagination.MaxLimit, q)
 	}
 }
 
 func TestNewPageMeta_TotalPages(t *testing.T) {
-	meta := common.NewPageMeta(common.PageQuery{Page: 2, Limit: 20}, 45)
+	meta := pagination.NewPageMeta(pagination.PageQuery{Page: 2, Limit: 20}, 45)
 	if meta.TotalPages != 3 {
 		t.Fatalf("want 3 total pages, got %d", meta.TotalPages)
 	}

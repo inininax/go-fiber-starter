@@ -11,7 +11,7 @@ import (
 	gormpostgres "gorm.io/driver/postgres"
 	"gorm.io/gorm"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
 )
 
 func newTestDB(t *testing.T) *gorm.DB {
@@ -66,7 +66,7 @@ func TestUpdate_NotFound_ReturnsErrNotFound(t *testing.T) {
 	repo := NewRepository(newTestDB(t))
 
 	_, err := repo.Update(context.Background(), 999, func(*Task) {})
-	if !errors.Is(err, common.ErrNotFound) {
+	if !errors.Is(err, apperror.ErrNotFound) {
 		t.Fatalf("want ErrNotFound, got %v", err)
 	}
 }

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/httpx"
 	"go-fiber-starter/internal/validator"
 )
 
@@ -41,5 +41,5 @@ func (h *Handler) Login(c fiber.Ctx) error {
 	if err != nil {
 		return err // ErrInvalidCredential 그대로 전달 → 401
 	}
-	return common.OK(c, LoginResponse{Token: token, TokenType: "Bearer", ExpiresAt: expiresAt})
+	return httpx.OK(c, LoginResponse{Token: token, TokenType: "Bearer", ExpiresAt: expiresAt})
 }

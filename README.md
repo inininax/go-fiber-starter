@@ -189,7 +189,10 @@ cmd/migrate      SQL 마이그레이션 CLI(up/down/version/force)
 internal/
   config         env 파싱 + fail-fast 검증
   database       연결/풀/slog 어댑터/AutoMigrate 정책
-  common         에러 카탈로그, 응답 엔벨로프, 페이지네이션
+  apperror       에러 카탈로그(AppError)
+  httpx          응답 엔벨로프 헬퍼
+  pagination     페이지네이션 파라미터/meta
+  testutil       handler 테스트 요청 헬퍼
   middleware     요청 로깅, Prometheus 수집
   router         fiber 앱 조립, 전역 ErrorHandler
   modules/task   예제 도메인 = 모듈 템플릿

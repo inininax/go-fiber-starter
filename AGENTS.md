@@ -49,7 +49,7 @@ docker compose up -d postgres                 # postgres 기동(mysql은 --profi
 - 서버 시작: `app.Listen(addr, fiber.ListenConfig{GracefulContext: ctx, ShutdownTimeout: ...})`.
 - ReadTimeout/WriteTimeout/IdleTimeout/BodyLimit은 **fiber.Config**에 있다(ListenConfig 아님).
 - validate 태그는 자동 실행이 아니라 `fiber.Config.StructValidator` 등록 필요 → `internal/validator` 패키지 사용.
-- 검증 실패 매핑은 `task/handler.go`의 `bindErrorToAppError`(400 파싱 / 422 필드별 details) 패턴을 따른다.
+- 검증 실패 매핑은 `validator.BindErrorToAppError`(400 파싱 / 422 필드별 details)를 모든 핸들러에서 사용한다.
 
 ## 마이그레이션 이원화 정책 (혼동 금지)
 
@@ -60,8 +60,9 @@ docker compose up -d postgres                 # postgres 기동(mysql은 --profi
 
 ## 응답/에러 규약
 
-- 모든 응답은 `common.Envelope`({success, data|error, meta}). 핸들러에서 직접 JSON 작성 금지 — `common.OK/Created/NoContent` 사용.
-- 에러는 `common.AppError` 코드 카탈로그(errors.go)로 반환하고 `fmt.Errorf("...: %w")` 래핑.
+- 모든 응답은 `httpx.Envelope`({success, data|error, meta}). 핸들러에서 직접 JSON 작성 금지 — `httpx.OK/Created/NoContent` 사용.
+- 에러는 `apperror.AppError` 코드 카탈로그(errors.go)로 반환하고 `fmt.Errorf("...: %w")` 래핑.
+  도메인 전용 센티널은 해당 모듈 errors.go에 선언한다(apperror 카탈로그에 넣지 않음).
 - 전역 ErrorHandler(router.go): 알 수 없는 에러는 로그에 상세 남기고 클라이언트엔 고정 메시지 500. 내부 메시지 노출 금지.
 
 ## 설정
@@ -72,11 +73,11 @@ docker compose up -d postgres                 # postgres 기동(mysql은 --profi
 ## 테스트 관례
 
 - service 단위 테스트: `fakeRepo` 주입(외부 I/O 없음). handler 통합 테스트: 임시 디렉터리 sqlite + 실제 GORM + `app.Test()`.
-- 테스트 헬퍼 `do()`는 204 등 빈 본문을 건너뛴다 — 빈 본문 디코딩으로 인한 EOF 재발 방지.
+- 테스트 헬퍼는 `testutil.Do` 단일 사용(204 등 빈 본문 건너뛰기 내장) — 빈 본문 디코딩으로 인한 EOF 재발 방지.
 - sqlite `:memory:`를 쓰지 않는다(풀 연결마다 별도 DB가 되어 플레이크). 임시 파일 경로를 쓸 것.
 
 ## 기타 컨벤션
 
 - 주석은 "왜"만 설명. 자명한 코드 주석 금지.
 - context는 `c.Context()`로 꺼내 service/repository까지 전파. 버림 금지.
-- 페이지네이션 limit은 `common.MaxLimit`(100)으로 클램프 — count 비용 방어.
+- 페이지네이션 limit은 `pagination.MaxLimit`(100)으로 클램프 — count 비용 방어.

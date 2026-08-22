@@ -5,7 +5,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
 )
 
 // RequireAuth는 Bearer 토큰을 검증하고 Identity를 Locals에 저장하는 가드다.
@@ -18,7 +18,7 @@ func RequireAuth(svc *Service) fiber.Handler {
 		header := c.Get("Authorization")
 		token, ok := strings.CutPrefix(header, "Bearer ")
 		if !ok || strings.TrimSpace(token) == "" {
-			return common.ErrUnauthorized
+			return apperror.ErrUnauthorized
 		}
 		id, err := svc.Verify(token)
 		if err != nil {

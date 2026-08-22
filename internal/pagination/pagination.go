@@ -1,4 +1,4 @@
-package common
+package pagination
 
 const (
 	DefaultPage  = 1

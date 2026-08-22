@@ -18,8 +18,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/gorm"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
 	"go-fiber-starter/internal/config"
+	"go-fiber-starter/internal/httpx"
 	appmw "go-fiber-starter/internal/middleware"
 	"go-fiber-starter/internal/modules/auth"
 	"go-fiber-starter/internal/modules/health"
@@ -85,10 +86,10 @@ func errorHandler(log *slog.Logger) fiber.ErrorHandler {
 		var fe *fiber.Error
 		if errors.As(err, &fe) {
 			appErr := mapFiberError(fe)
-			return c.Status(fe.Code).JSON(common.ErrorBody(appErr))
+			return c.Status(fe.Code).JSON(httpx.ErrorBody(appErr))
 		}
 
-		appErr := common.AsAppError(err)
+		appErr := apperror.AsAppError(err)
 		fields := []any{
 			"error", err.Error(),
 			"method", c.Method(),
@@ -98,23 +99,23 @@ func errorHandler(log *slog.Logger) fiber.ErrorHandler {
 		if appErr.Status >= http.StatusInternalServerError {
 			log.Error("request failed", fields...)
 			// 클라이언트에는 고정 메시지만 노출한다.
-			safe := *common.ErrInternal
-			return c.Status(safe.Status).JSON(common.ErrorBody(&safe))
+			safe := *apperror.ErrInternal
+			return c.Status(safe.Status).JSON(httpx.ErrorBody(&safe))
 		}
 		log.Warn("request rejected", fields...)
-		return c.Status(appErr.Status).JSON(common.ErrorBody(appErr))
+		return c.Status(appErr.Status).JSON(httpx.ErrorBody(appErr))
 	}
 }
 
-func mapFiberError(fe *fiber.Error) *common.AppError {
+func mapFiberError(fe *fiber.Error) *apperror.AppError {
 	switch fe.Code {
 	case fiber.StatusNotFound:
-		return common.ErrNotFound.WithCause(fe)
+		return apperror.ErrNotFound.WithCause(fe)
 	case fiber.StatusTooManyRequests:
-		return &common.AppError{Code: "RATE_LIMITED", Status: fe.Code, Message: "too many requests"}
+		return &apperror.AppError{Code: "RATE_LIMITED", Status: fe.Code, Message: "too many requests"}
 	case fiber.StatusRequestEntityTooLarge:
-		return &common.AppError{Code: "PAYLOAD_TOO_LARGE", Status: fe.Code, Message: "request body too large"}
+		return &apperror.AppError{Code: "PAYLOAD_TOO_LARGE", Status: fe.Code, Message: "request body too large"}
 	default:
-		return &common.AppError{Code: fmt.Sprintf("HTTP_%d", fe.Code), Status: fe.Code, Message: fe.Message}
+		return &apperror.AppError{Code: fmt.Sprintf("HTTP_%d", fe.Code), Status: fe.Code, Message: fe.Message}
 	}
 }

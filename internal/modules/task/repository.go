@@ -7,7 +7,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/apperror"
+	"go-fiber-starter/internal/pagination"
 )
 
 // gormRepository는 task.Repository의 GORM 구현체다.
@@ -29,14 +30,14 @@ func (r *gormRepository) FindByID(ctx context.Context, id uint) (*Task, error) {
 	var t Task
 	if err := r.db.WithContext(ctx).First(&t, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, common.ErrTaskNotFound
+			return nil, ErrTaskNotFound
 		}
 		return nil, err
 	}
 	return &t, nil
 }
 
-func (r *gormRepository) List(ctx context.Context, q common.PageQuery) ([]Task, int64, error) {
+func (r *gormRepository) List(ctx context.Context, q pagination.PageQuery) ([]Task, int64, error) {
 	var (
 		tasks []Task
 		total int64
@@ -69,7 +70,7 @@ func (r *gormRepository) Update(ctx context.Context, id uint, mutate func(*Task)
 		var t Task
 		if err := applyRowLock(tx).First(&t, id).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
-				return common.ErrNotFound
+				return apperror.ErrNotFound
 			}
 			return err
 		}
@@ -92,7 +93,7 @@ func (r *gormRepository) Delete(ctx context.Context, id uint) error {
 		return res.Error
 	}
 	if res.RowsAffected == 0 {
-		return common.ErrTaskNotFound
+		return ErrTaskNotFound
 	}
 	return nil
 }

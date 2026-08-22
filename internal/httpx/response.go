@@ -1,7 +1,9 @@
-package common
+package httpx
 
 import (
 	"github.com/gofiber/fiber/v3"
+
+	"go-fiber-starter/internal/apperror"
 )
 
 // Envelope는 모든 API 응답의 공통 래퍼다.
@@ -13,9 +15,9 @@ type Envelope struct {
 }
 
 type Error struct {
-	Code    string   `json:"code"`
-	Message string   `json:"message"`
-	Details []Detail `json:"details,omitempty"`
+	Code    string            `json:"code"`
+	Message string            `json:"message"`
+	Details []apperror.Detail `json:"details,omitempty"`
 }
 
 func OK(c fiber.Ctx, data any) error {
@@ -35,7 +37,7 @@ func NoContent(c fiber.Ctx) error {
 }
 
 // ErrorBody는 전역 ErrorHandler와 핸들러에서 동일한 실패 포맷을 쓰게 한다.
-func ErrorBody(appErr *AppError) Envelope {
+func ErrorBody(appErr *apperror.AppError) Envelope {
 	return Envelope{
 		Success: false,
 		Error: &Error{
