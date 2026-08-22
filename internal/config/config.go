@@ -47,6 +47,12 @@ type Config struct {
 	IdleTimeout  time.Duration `env:"HTTP_IDLE_TIMEOUT" envDefault:"60s"`
 
 	ShutdownGracePeriod time.Duration `env:"SHUTDOWN_GRACE_PERIOD" envDefault:"10s"`
+
+	AuthEnabled      bool          `env:"AUTH_ENABLED" envDefault:"false"`
+	AuthJWTSecret    string        `env:"AUTH_JWT_SECRET"`
+	AuthTokenTTL     time.Duration `env:"AUTH_TOKEN_TTL" envDefault:"1h"`
+	AuthDemoUsername string        `env:"AUTH_DEMO_USERNAME" envDefault:"admin"`
+	AuthDemoPassword string        `env:"AUTH_DEMO_PASSWORD" envDefault:"admin123"`
 }
 
 // Load는 .env(선택)와 환경변수를 읽어 Config를 구성하고, 규칙 위반 시 모든 오류를 모아 반환한다.
@@ -106,6 +112,14 @@ func (c *Config) Validate() error {
 	}
 	if c.RateLimitPerMinute < 1 {
 		addf("RATE_LIMIT_PER_MINUTE must be >= 1, got %d", c.RateLimitPerMinute)
+	}
+	if c.AuthEnabled {
+		if len(c.AuthJWTSecret) < 32 {
+			addf("AUTH_JWT_SECRET must be >= 32 bytes when AUTH_ENABLED=true (got %d bytes)", len(c.AuthJWTSecret))
+		}
+		if c.AuthTokenTTL <= 0 {
+			addf("AUTH_TOKEN_TTL must be positive, got %s", c.AuthTokenTTL)
+		}
 	}
 	for _, d := range []struct {
 		name string

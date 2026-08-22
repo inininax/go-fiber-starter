@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/golang-migrate/migrate/v4"
 
@@ -51,7 +52,11 @@ func run(args []string) error {
 		return fmt.Errorf("read migrations: %w", err)
 	}
 	// golang-migrate는 databaseURL의 스킴(postgres://|mysql://)으로 드라이버를 식별한다.
-	m, err := migrate.NewWithSourceInstance("iofs", src, migrateURL(cfg))
+	murl, err := migrateURL(cfg)
+	if err != nil {
+		return err
+	}
+	m, err := migrate.NewWithSourceInstance("iofs", src, murl)
 	if err != nil {
 		return fmt.Errorf("init migrator: %w", err)
 	}
@@ -98,9 +103,14 @@ func run(args []string) error {
 //   - mysql:    mysql://user:pass@tcp(host:3306)/db  (go-sql-driver 형식 유지)
 //
 // DSN에 스킴이 이미 있으면 드라이버명으로 치환하고, 없으면 접두어로 붙인다.
-func migrateURL(cfg *config.Config) string {
-	dsn := stripScheme(cfg.DBDSN)
-	return string(cfg.DBDriver) + "://" + dsn
+// key-value DSN(host=... user=...)은 URL 파싱이 불가하므로 명확한 에러로 안내한다.
+func migrateURL(cfg *config.Config) (string, error) {
+	dsn := cfg.DBDSN
+	if strings.Contains(dsn, "=") && !strings.Contains(dsn, "://") && cfg.DBDriver == config.DBDriverPostgres {
+		return "", fmt.Errorf(
+			"DB_DSN is in key-value form which golang-migrate cannot parse; use URL form: postgres://user:pass@host:5432/db")
+	}
+	return string(cfg.DBDriver) + "://" + stripScheme(dsn), nil
 }
 
 func isNoChange(err error) bool {

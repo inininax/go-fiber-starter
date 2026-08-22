@@ -70,6 +70,27 @@ func TestValidate_IdleConnsBoundedByMaxConns(t *testing.T) {
 	}
 }
 
+func TestValidate_AuthRules(t *testing.T) {
+	cfg := validConfig()
+
+	// 비활성화면 시크릿 없어도 통과
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("auth disabled should not require secret, got %v", err)
+	}
+
+	cfg.AuthEnabled = true
+	cfg.AuthJWTSecret = "short"
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "AUTH_JWT_SECRET") {
+		t.Fatalf("expected short-secret rejection, got %v", err)
+	}
+
+	cfg.AuthJWTSecret = strings.Repeat("x", 32)
+	cfg.AuthTokenTTL = -1 * time.Second
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "AUTH_TOKEN_TTL") {
+		t.Fatalf("expected non-positive TTL rejection, got %v", err)
+	}
+}
+
 func TestNewPageQuery_ClampsLimit(t *testing.T) {
 	q := common.NewPageQuery(0, 500)
 	if q.Page != common.DefaultPage || q.Limit != common.MaxLimit {

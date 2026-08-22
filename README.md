@@ -60,6 +60,35 @@ go run ./cmd/api
 | `DB_AUTO_MIGRATE` | `true` | prod(pg/mysql)에서 true면 시작 거부 |
 | `CORS_ALLOWED_ORIGINS` | `*` | 콤마 구분 |
 | `RATE_LIMIT_PER_MINUTE` | `120` | IP당 분당 요청 수 |
+| `AUTH_ENABLED` | `false` | true면 로그인 활성화 + `/api/v1/tasks` 전체 Bearer 요구 |
+| `AUTH_JWT_SECRET` | — | AUTH_ENABLED=true 시 32바이트 이상 필수 |
+| `AUTH_TOKEN_TTL` | `1h` | 액세스 토큰 만료 |
+
+## 인증 (JWT 스캐폴드)
+
+`AUTH_ENABLED=true`로 실행하면 데모 자격증명(env)으로 JWT를 발급하고 task API가 보호된다.
+
+```bash
+AUTH_ENABLED=true AUTH_JWT_SECRET=$(openssl rand -base64 48) go run ./cmd/api
+
+# 로그인 → 토큰 발급 (200)
+curl -s -X POST http://localhost:8080/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"admin","password":"admin123"}'
+# {"success":true,"data":{"token":"eyJ...","token_type":"Bearer","expires_at":"..."}}
+
+TOKEN=eyJ...
+
+# 토큰 없이 접근 → 401 UNAUTHORIZED
+curl -s http://localhost:8080/api/v1/tasks
+
+# Bearer 토큰으로 접근
+curl -s http://localhost:8080/api/v1/tasks -H "Authorization: Bearer $TOKEN"
+```
+
+> 이 스캐폴드의 자격증명 검사는 env 기반 demo 구현이다. 실제 사용자 스토어 연동 시
+> `internal/modules/auth/service.go`의 `Authenticator` 인터페이스를 DB 기반(비밀번호 해시 비교)으로 교체하라.
+> 핸들러에서 현재 신원: `c.Locals(auth.IdentityKey).(auth.Identity)`.
 
 ## API 예제
 
@@ -181,19 +210,22 @@ Docker 이미지: 멀티스테이지 빌드, non-root, HEALTHCHECK(/livez).
 이 저장소는 AI 에이전트 공동 작업을 전제로 문서가 이원화되어 있다.
 **운영 규칙의 단일 출처는 루트 `AGENTS.md` 하나뿐**이며, 나머지는 이를 가리키는 얇은 포인터다.
 
-| 파일 | 역할 | 읽는 주체 |
+| 에이전트 | 연결 방식 | 파일 |
 |---|---|---|
-| **AGENTS.md** | 명령어, 아키텍처 불변식, Fiber v3 함정, 마이그레이션 정책 등 운영 규칙 | Codex(네이티브), opencode, Cursor, Jules 등 대부분의 최신 에이전트 |
-| `CLAUDE.md` | `@AGENTS.md` 임포트 한 줄 — 규칙 중복 없이 Claude Code 연결 | Claude Code |
-| `.github/copilot-instructions.md` | 핵심 요약 + AGENTS.md 참조 | GitHub Copilot |
-| `PROMPT.md` | 프로젝트 생성 당시 설계 사양(이력 문서) | 사람/에이전트 |
+| OpenAI Codex | 네이티브 자동 인식 | `AGENTS.md` |
+| opencode | 네이티브 자동 인식 | `AGENTS.md` |
+| Cursor | 네이티브 자동 인식 | `AGENTS.md` |
+| Claude Code | 임포트 포인터 | `CLAUDE.md` (`@AGENTS.md` 한 줄) |
+| Gemini CLI | 임포트 포인터 | `GEMINI.md` (`@AGENTS.md` 한 줄) |
+| Windsurf | 요약 포인터 | `.windsurfrules` |
+| GitHub Copilot | 요약 포인터 | `.github/copilot-instructions.md` |
 
-**규칙 변경 시 AGENTS.md만 수정한다.** 새 에이전트 도입 시에도 별도 문서를 만들지 말고
-AGENTS.md를 읽도록 포인터만 추가할 것.
+**규칙 변경 시 AGENTS.md만 수정한다.** 포인터 파일들은 내용이 바뀌지 않는 한 건드리지 않는다.
+새 에이전트 도입 시에도 별도 문서를 만들지 말고 AGENTS.md를 읽도록 포인터만 추가할 것.
 
 ## Roadmap
 
-- JWT 인증 모듈 스캐폴드(golang-jwt/v5, Bearer 추출 미들웨어)
+- ~~JWT 인증 모듈 스캐폴드(golang-jwt/v5, Bearer 추출 미들웨어)~~ → 구현 완료(위 "인증" 섹션). 남은 과제: DB 기반 Authenticator 교체
 - OpenAPI 3 스펙 문서화 및 `/docs` 서빙
 - OpenTelemetry tracing(현재 request_id 상관관계까지만 제공)
 - cursor 기반 페이지네이션(대량 테이블용)

@@ -3,6 +3,9 @@
 이 저장소에서 작업하는 모든 AI 에이전트(Codex, Claude, Cursor, opencode 등)의 운영 가이드.
 사용법은 README.md, 개발 사양은 PROMPT.md를 참고. 이 문서는 에이전트가 실수하기 쉬운 것만 다룬다.
 
+> **규칙 변경은 이 파일 하나만 수정한다.** CLAUDE.md / GEMINI.md / .windsurfrules /
+> .github/copilot-instructions.md는 이 파일을 가리키는 정적 포인터라 수정 불요.
+
 ## 명령어
 
 ```bash
@@ -16,6 +19,11 @@ docker compose up -d postgres                 # postgres 기동(mysql은 --profi
 - **CI는 `gofmt -l`이 비어있어야 통과한다.** 파일 수정 후 반드시 `gofmt -w .` 포함.
 - 새 마이그레이션은 `make migrate-new name=add_users`로 생성(버전 번호 자동 계산). 수동으로 파일 만들면 버전 충돌 위험.
 - postgres/mysql 로컬 실행 시 환경변수 예시는 README "Quickstart"와 `.env.example` 주석 참고.
+
+## 상세 규칙 인덱스 (필요 시 읽기)
+
+- [docs/ai-rules/new-module-checklist.md](docs/ai-rules/new-module-checklist.md) — 새 도메인 모듈 추가 시: 복제→마이그레이션 이원화→조립→테스트 체크리스트
+- 새 상세 규칙은 `docs/ai-rules/`에 kebab-case.md로 추가하고 위 인덱스에 한 줄 트리거를 등록한다 (절차: docs/ai-rules/README.md). 코어(이 파일)는 작게 유지.
 
 ## 아키텍처 불변식 (위반 시 리뷰 거부)
 

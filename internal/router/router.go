@@ -21,6 +21,7 @@ import (
 	"go-fiber-starter/internal/common"
 	"go-fiber-starter/internal/config"
 	appmw "go-fiber-starter/internal/middleware"
+	"go-fiber-starter/internal/modules/auth"
 	"go-fiber-starter/internal/modules/health"
 	"go-fiber-starter/internal/modules/task"
 )
@@ -60,7 +61,15 @@ func New(cfg *config.Config, db *gorm.DB, log *slog.Logger, reg *prometheus.Regi
 	app.Get("/metrics", adaptor.HTTPHandler(promhttp.HandlerFor(reg, promhttp.HandlerOpts{})))
 
 	v1 := app.Group("/api/v1")
-	task.RegisterRoutes(v1, taskService(db))
+
+	var taskGuard []fiber.Handler
+	if cfg.AuthEnabled {
+		authSvc := auth.NewService(auth.NewDemoAuthenticator(cfg), cfg.AuthJWTSecret, cfg.AuthTokenTTL)
+		auth.RegisterRoutes(v1, authSvc) // 로그인은 가드 밖
+		taskGuard = []fiber.Handler{auth.RequireAuth(authSvc)}
+		log.Info("auth enabled", "protected", "/api/v1/tasks")
+	}
+	task.RegisterRoutes(v1, taskService(db), taskGuard...)
 
 	return app
 }

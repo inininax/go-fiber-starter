@@ -8,10 +8,12 @@ import (
 
 // 에러 코드 카탈로그: 클라이언트 노출용 안정 식별자. 코드 추가 시 여기만 수정.
 const (
-	CodeInvalidRequest = "INVALID_REQUEST"
-	CodeNotFound       = "NOT_FOUND"
-	CodeConflict       = "CONFLICT"
-	CodeInternal       = "INTERNAL_ERROR"
+	CodeInvalidRequest    = "INVALID_REQUEST"
+	CodeNotFound          = "NOT_FOUND"
+	CodeConflict          = "CONFLICT"
+	CodeInternal          = "INTERNAL_ERROR"
+	CodeUnauthorized      = "UNAUTHORIZED"
+	CodeInvalidCredential = "INVALID_CREDENTIALS"
 
 	CodeTaskNotFound = "TASK_NOT_FOUND"
 )
@@ -41,6 +43,16 @@ func (e *AppError) Error() string {
 
 func (e *AppError) Unwrap() error { return e.err }
 
+// Is는 코드 기반 동등성을 제공한다. WithCause로 복사된 인스턴스도
+// errors.Is(err, common.ErrXxx) 매칭이 되도록 한다.
+func (e *AppError) Is(target error) bool {
+	t, ok := target.(*AppError)
+	if !ok {
+		return false
+	}
+	return e.Code == t.Code
+}
+
 // WithCause는 원인 에러를 붙여 새 AppError를 반환한다 (체이닝용).
 func (e *AppError) WithCause(err error) *AppError {
 	cp := *e
@@ -53,6 +65,9 @@ var (
 	ErrNotFound       = &AppError{Code: CodeNotFound, Status: http.StatusNotFound, Message: "resource not found"}
 	ErrConflict       = &AppError{Code: CodeConflict, Status: http.StatusConflict, Message: "resource conflict"}
 	ErrInternal       = &AppError{Code: CodeInternal, Status: http.StatusInternalServerError, Message: "internal server error"}
+
+	ErrUnauthorized      = &AppError{Code: CodeUnauthorized, Status: http.StatusUnauthorized, Message: "authentication required"}
+	ErrInvalidCredential = &AppError{Code: CodeInvalidCredential, Status: http.StatusUnauthorized, Message: "invalid username or password"}
 
 	ErrTaskNotFound = (&AppError{Code: CodeTaskNotFound, Status: http.StatusNotFound, Message: "task not found"})
 )

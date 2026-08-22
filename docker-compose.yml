@@ -29,6 +29,19 @@ services:
       - mysqldata:/var/lib/mysql
 
   # 전체 스택 실행: docker compose --profile full up -d --build
+  # migrate: 원샷 SQL 마이그레이션. 앱은 이 서비스가 성공 종료된 뒤 기동된다.
+  migrate:
+    build: .
+    profiles: [full]
+    entrypoint: ["/app/migrate"]
+    command: ["up"]
+    environment:
+      DB_DRIVER: postgres
+      DB_DSN: postgres://starter:starter@postgres:5432/starter?sslmode=disable
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   app:
     build: .
     profiles: [full]
@@ -43,6 +56,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
 
 volumes:
   pgdata:

@@ -1,13 +1,12 @@
 package task
 
 import (
-	"errors"
 	"strconv"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v3"
 
 	"go-fiber-starter/internal/common"
+	"go-fiber-starter/internal/validator"
 )
 
 type Handler struct {
@@ -101,16 +100,7 @@ func atoiDefault(raw string, def int) int {
 	return n
 }
 
-// bindErrorToAppError는 Fiber Bind 실패를 통일된 에러로 변환한다.
-// 파싱 실패 → 400, validator 위반 → 422 + 필드별 상세.
+// bindErrorToAppError는 validator.BindErrorToAppError로 위임한다 (공용 계약 유지).
 func bindErrorToAppError(err error) *common.AppError {
-	var valErrs validator.ValidationErrors
-	if errors.As(err, &valErrs) {
-		details := make([]common.Detail, 0, len(valErrs))
-		for _, ve := range valErrs {
-			details = append(details, common.Detail{Field: ve.Field(), Reason: ve.ActualTag()})
-		}
-		return common.NewValidation(details).WithCause(err)
-	}
-	return common.NewBadRequest("malformed request body").WithCause(err)
+	return validator.BindErrorToAppError(err)
 }
