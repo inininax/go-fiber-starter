@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 
 	"go-fiber-starter/internal/common"
 )
@@ -51,12 +52,22 @@ func (r *gormRepository) List(ctx context.Context, q common.PageQuery) ([]Task, 
 	return tasks, total, err
 }
 
-// Update는 트랜잭션으로 읽기-수정-쓰기를 묶어 부분 갱신의 원자성을 보장한다.
+// applyRowLock은 SELECT에 행 잠금(FOR UPDATE)을 걸어 읽기-수정-쓰기 경쟁을 직렬화한다.
+// sqlite는 FOR UPDATE 구문을 파싱하지 못해 오류이므로, dev 전용 단일 인스턴스 전제로 제외한다.
+func applyRowLock(tx *gorm.DB) *gorm.DB {
+	if tx.Dialector.Name() == "sqlite" {
+		return tx
+	}
+	return tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
+}
+
+// Update는 트랜잭션으로 읽기-수정-쓰기를 묶어 부분 갱신의 원자성을 보장하고,
+// 행 잠금으로 동시 수정 간의 lost update를 막는다.
 func (r *gormRepository) Update(ctx context.Context, id uint, mutate func(*Task)) (*Task, error) {
 	var updated *Task
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var t Task
-		if err := tx.First(&t, id).Error; err != nil {
+		if err := applyRowLock(tx).First(&t, id).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return common.ErrNotFound
 			}

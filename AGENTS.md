@@ -3,8 +3,16 @@
 이 저장소에서 작업하는 모든 AI 에이전트(Codex, Claude, Cursor, opencode 등)의 운영 가이드.
 사용법은 README.md, 개발 사양은 PROMPT.md를 참고. 이 문서는 에이전트가 실수하기 쉬운 것만 다룬다.
 
-> **규칙 변경은 이 파일 하나만 수정한다.** CLAUDE.md / GEMINI.md / .windsurfrules /
-> .github/copilot-instructions.md는 이 파일을 가리키는 정적 포인터라 수정 불요.
+## 문서 위치 (에이전트 규칙 와이어링)
+
+- 이 파일(`AGENTS.md`)이 에이전트 지침의 **단일 출처이다.** Codex/OpenCode/Cursor(신버전)가 네이티브로 읽는다.
+- 자체 파일명이 필요한 도구용으로 심링크만 존재: `CLAUDE.md`(Claude Code), `GEMINI.md`(Gemini CLI),
+  `.github/copilot-instructions.md`(GitHub Copilot), `.windsurfrules`(Windsurf).
+  **심링크 경유로 쓰지 말고 AGENTS.md만 수정할 것.**
+- `.cursor/rules/project.mdc`는 요약본(mdc frontmatter 때문에 심링크 불가). 핵심 변경 시 일관성 유지.
+- 주제별 상세 규칙은 `.agents/rules/*.md`에 둔다(향후 규칙 확장 포인트). OpenCode는
+  `opencode.json`의 glob으로 이 디렉터리를 자동 로드하고, Claude Code는 아래 목록의 `@import`를 해석한다.
+  새 규칙 추가 절차는 `.agents/rules/README.md` 먼저 읽을 것.
 
 ## 명령어
 
@@ -22,8 +30,8 @@ docker compose up -d postgres                 # postgres 기동(mysql은 --profi
 
 ## 상세 규칙 인덱스 (필요 시 읽기)
 
-- [docs/ai-rules/new-module-checklist.md](docs/ai-rules/new-module-checklist.md) — 새 도메인 모듈 추가 시: 복제→마이그레이션 이원화→조립→테스트 체크리스트
-- 새 상세 규칙은 `docs/ai-rules/`에 kebab-case.md로 추가하고 위 인덱스에 한 줄 트리거를 등록한다 (절차: docs/ai-rules/README.md). 코어(이 파일)는 작게 유지.
+- @.agents/rules/new-module-checklist.md — 새 도메인 모듈 추가 시: 복제→마이그레이션 이원화→조립→테스트 체크리스트
+- 새 상세 규칙은 `.agents/rules/`에 kebab-case.md로 추가하고 위 목록에 `@.agents/rules/<topic>.md` 한 줄을 등록한다 (절차: .agents/rules/README.md). 코어(이 파일)는 작게 유지.
 
 ## 아키텍처 불변식 (위반 시 리뷰 거부)
 

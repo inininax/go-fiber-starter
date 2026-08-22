@@ -1,8 +1,1 @@
-이 저장소의 모든 AI 규칙은 루트 AGENTS.md가 단일 출처이다. 작업 시작 전 반드시 읽을 것.
-
-핵심 요약(상세는 AGENTS.md):
-- Go + Fiber v3 + GORM. Fiber v2 문법 금지(c.Bind().Body(), func(c fiber.Ctx) error).
-- 계층: handler → service → repository → model. *gorm.DB는 repository에만.
-- 새 도메인은 internal/modules/task/ 복제. 조립은 internal/router/wiring.go와 router.go.
-- 응답/에러는 common.Envelope / common.AppError 카탈로그 통일.
-- 커밋 전: gofmt -w . && go vet ./... && go test ./... -race
+AGENTS.md

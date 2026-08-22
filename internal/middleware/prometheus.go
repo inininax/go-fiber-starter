@@ -49,7 +49,7 @@ func (p *Prometheus) Handler() fiber.Handler {
 		if route == "" {
 			route = "unmatched"
 		}
-		status := strconv.Itoa(c.Response().StatusCode())
+		status := strconv.Itoa(EffectiveStatus(c, err))
 		p.requestsTotal.WithLabelValues(c.Method(), route, status).Inc()
 		p.duration.WithLabelValues(c.Method(), route).Observe(timeSince(start))
 		return err

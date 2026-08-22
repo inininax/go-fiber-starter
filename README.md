@@ -60,6 +60,9 @@ go run ./cmd/api
 | `DB_AUTO_MIGRATE` | `true` | prod(pg/mysql)에서 true면 시작 거부 |
 | `CORS_ALLOWED_ORIGINS` | `*` | 콤마 구분 |
 | `RATE_LIMIT_PER_MINUTE` | `120` | IP당 분당 요청 수 |
+| `TRUST_PROXY` | `false` | 역프록시 뒤에서만 true. true면 `TRUST_PROXY_PROXIES` 필수 |
+| `TRUST_PROXY_PROXIES` | — | 신뢰할 프록시 IP/CIDR 목록(콤마 구분). TRUST_PROXY=false인데 설정하면 시작 거부 |
+| `TRUST_PROXY_HEADER` | `X-Forwarded-For` | 클라이언트 IP를 읽을 헤더 |
 | `AUTH_ENABLED` | `false` | true면 로그인 활성화 + `/api/v1/tasks` 전체 Bearer 요구 |
 | `AUTH_JWT_SECRET` | — | AUTH_ENABLED=true 시 32바이트 이상 필수 |
 | `AUTH_TOKEN_TTL` | `1h` | 액세스 토큰 만료 |
@@ -89,6 +92,11 @@ curl -s http://localhost:8080/api/v1/tasks -H "Authorization: Bearer $TOKEN"
 > 이 스캐폴드의 자격증명 검사는 env 기반 demo 구현이다. 실제 사용자 스토어 연동 시
 > `internal/modules/auth/service.go`의 `Authenticator` 인터페이스를 DB 기반(비밀번호 해시 비교)으로 교체하라.
 > 핸들러에서 현재 신원: `c.Locals(auth.IdentityKey).(auth.Identity)`.
+
+> **⚠️ 데모 자격증명은 local/dev 전용이다.** 기본값(`admin`/`admin123`)은 절대 운영에 사용하지 말 것.
+> `APP_ENV=prod` + `AUTH_ENABLED=true` 상태에서 기본값이 남아 있으면 시작이 거부된다
+> (`AUTH_DEMO_USERNAME`/`AUTH_DEMO_PASSWORD`를 명시적으로 설정하거나 DB 기반 Authenticator로 교체).
+> 운영 환경은 DB 기반 Authenticator(비밀번호 해시 비교) 사용을 권장한다.
 
 ## API 예제
 
@@ -212,16 +220,17 @@ Docker 이미지: 멀티스테이지 빌드, non-root, HEALTHCHECK(/livez).
 
 | 에이전트 | 연결 방식 | 파일 |
 |---|---|---|
-| OpenAI Codex | 네이티브 자동 인식 | `AGENTS.md` |
-| opencode | 네이티브 자동 인식 | `AGENTS.md` |
-| Cursor | 네이티브 자동 인식 | `AGENTS.md` |
-| Claude Code | 임포트 포인터 | `CLAUDE.md` (`@AGENTS.md` 한 줄) |
-| Gemini CLI | 임포트 포인터 | `GEMINI.md` (`@AGENTS.md` 한 줄) |
-| Windsurf | 요약 포인터 | `.windsurfrules` |
-| GitHub Copilot | 요약 포인터 | `.github/copilot-instructions.md` |
+| OpenAI Codex / opencode / Cursor(신버전) | 네이티브 자동 인식 | `AGENTS.md` |
+| Claude Code | 심링크 + `@import` | `CLAUDE.md` → `AGENTS.md` |
+| Gemini CLI | 심링크 | `GEMINI.md` → `AGENTS.md` |
+| Windsurf | 심링크 | `.windsurfrules` → `AGENTS.md` |
+| GitHub Copilot | 심링크 | `.github/copilot-instructions.md` → `AGENTS.md` |
+| Cursor(구버전 호환) | 요약본(mdc frontmatter) | `.cursor/rules/project.mdc` |
 
-**규칙 변경 시 AGENTS.md만 수정한다.** 포인터 파일들은 내용이 바뀌지 않는 한 건드리지 않는다.
-새 에이전트 도입 시에도 별도 문서를 만들지 말고 AGENTS.md를 읽도록 포인터만 추가할 것.
+주제별 상세 규칙은 **`.agents/rules/*.md`**에 둔다. OpenCode는 `opencode.json`의 glob으로
+자동 로드하고, Claude Code는 AGENTS.md의 `@import` 줄로 해석한다.
+**규칙 변경 시 AGENTS.md(또는 .agents/rules/)만 수정한다.** 절차: `.agents/rules/README.md`.
+새 에이전트 도입 시에도 별도 문서를 만들지 말고 AGENTS.md 심링크만 추가할 것.
 
 ## Roadmap
 

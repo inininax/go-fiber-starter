@@ -35,3 +35,63 @@ jobs:
 
       - name: build
         run: CGO_ENABLED=0 go build ./...
+
+  # SQL 마이그레이션은 prod 계열 드라이버(postgres/mysql)에서만 동작하므로 실제 DB 서비스로 검증한다.
+  # up → version → down → up 사이클로 적용/롤백/재적용을 모두 확인한다.
+  migrations:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ci_migrate
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_USER: migrate
+          MYSQL_PASSWORD: migrate
+          MYSQL_DATABASE: ci_migrate
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h localhost -uroot -proot"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: postgres migrations
+        env:
+          DB_DRIVER: postgres
+          DB_DSN: 'postgres://postgres:postgres@localhost:5432/ci_migrate?sslmode=disable'
+        run: |
+          go run ./cmd/migrate up
+          go run ./cmd/migrate version
+          go run ./cmd/migrate down
+          go run ./cmd/migrate up
+
+      - name: mysql migrations
+        env:
+          DB_DRIVER: mysql
+          DB_DSN: 'migrate:migrate@tcp(localhost:3306)/ci_migrate?parseTime=true'
+        run: |
+          go run ./cmd/migrate up
+          go run ./cmd/migrate version
+          go run ./cmd/migrate down
+          go run ./cmd/migrate up

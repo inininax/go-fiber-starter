@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"crypto/subtle"
 	"errors"
 	"fmt"
 	"time"
@@ -34,7 +35,10 @@ func NewDemoAuthenticator(cfg *config.Config) Authenticator {
 }
 
 func (d *demoAuthenticator) Verify(_ context.Context, username, password string) (Identity, error) {
-	if username != d.username || password != d.password {
+	// 타이밍 공격 방지를 위해 constant-time 비교. 단락 평가를 피하려고 두 비교를 모두 수행한다.
+	userOK := subtle.ConstantTimeCompare([]byte(username), []byte(d.username)) == 1
+	passOK := subtle.ConstantTimeCompare([]byte(password), []byte(d.password)) == 1
+	if !(userOK && passOK) {
 		return Identity{}, common.ErrInvalidCredential
 	}
 	return Identity{Username: username}, nil

@@ -91,6 +91,91 @@ func TestValidate_AuthRules(t *testing.T) {
 	}
 }
 
+func TestValidate_ProdDefaultDemoCredentialsRejected(t *testing.T) {
+	cfg := validConfig()
+	cfg.Env = EnvProd
+	cfg.AuthEnabled = true
+	cfg.AuthJWTSecret = strings.Repeat("x", 32)
+	cfg.AuthTokenTTL = time.Hour
+	// 데모 기본값이 하나만 남아 있어도 거부한다.
+	cfg.AuthDemoUsername = DefaultDemoUsername
+	cfg.AuthDemoPassword = "explicit-strong-password"
+
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "AUTH_DEMO_USERNAME") {
+		t.Fatalf("expected prod+default demo credential rejection, got %v", err)
+	}
+}
+
+func TestValidate_ProdExplicitDemoCredentialsAccepted(t *testing.T) {
+	cfg := validConfig()
+	cfg.Env = EnvProd
+	cfg.DBDriver = DBDriverPostgres
+	cfg.AuthEnabled = true
+	cfg.AuthJWTSecret = strings.Repeat("x", 32)
+	cfg.AuthTokenTTL = time.Hour
+	cfg.AuthDemoUsername = "ops-user"
+	cfg.AuthDemoPassword = "ops-password"
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected explicit credentials accepted in prod, got %v", err)
+	}
+}
+
+func TestValidate_LocalDefaultDemoCredentialsAccepted(t *testing.T) {
+	cfg := validConfig()
+	cfg.AuthEnabled = true
+	cfg.AuthJWTSecret = strings.Repeat("x", 32)
+	cfg.AuthTokenTTL = time.Hour
+	cfg.AuthDemoUsername = DefaultDemoUsername
+	cfg.AuthDemoPassword = DefaultDemoPassword
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected default demo credentials accepted outside prod, got %v", err)
+	}
+}
+
+func TestValidate_TrustProxyRules(t *testing.T) {
+	// OK: true + 유효한 allowlist
+	cfg := validConfig()
+	cfg.TrustProxy = true
+	cfg.TrustProxyProxies = []string{"10.0.0.5", "172.17.0.0/16"}
+	cfg.TrustProxyHeader = "X-Forwarded-For"
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected valid trust proxy config, got %v", err)
+	}
+
+	// true인데 allowlist 없으면 거부
+	cfg = validConfig()
+	cfg.TrustProxy = true
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "TRUST_PROXY_PROXIES") {
+		t.Fatalf("expected missing-proxies rejection, got %v", err)
+	}
+
+	// IP/CIDR 형식 오류 항목은 거부
+	cfg = validConfig()
+	cfg.TrustProxy = true
+	cfg.TrustProxyProxies = []string{"10.0.0.5", "not-an-ip"}
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "not-an-ip") {
+		t.Fatalf("expected invalid CIDR rejection, got %v", err)
+	}
+
+	// true인데 헤더가 빈 문자열이면 거부
+	cfg = validConfig()
+	cfg.TrustProxy = true
+	cfg.TrustProxyProxies = []string{"10.0.0.5"}
+	cfg.TrustProxyHeader = ""
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "TRUST_PROXY_HEADER") {
+		t.Fatalf("expected empty header rejection, got %v", err)
+	}
+
+	// false인데 allowlist를 두면 무효 설정으로 거부
+	cfg = validConfig()
+	cfg.TrustProxyProxies = []string{"10.0.0.5"}
+	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "TRUST_PROXY=false") {
+		t.Fatalf("expected proxies-without-trust rejection, got %v", err)
+	}
+}
+
 func TestNewPageQuery_ClampsLimit(t *testing.T) {
 	q := common.NewPageQuery(0, 500)
 	if q.Page != common.DefaultPage || q.Limit != common.MaxLimit {

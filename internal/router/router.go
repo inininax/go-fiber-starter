@@ -38,6 +38,10 @@ func New(cfg *config.Config, db *gorm.DB, log *slog.Logger, reg *prometheus.Regi
 		IdleTimeout:     cfg.IdleTimeout,
 		StructValidator: newStructValidator(),
 		ErrorHandler:    errorHandler(log),
+		// 역프록시 뒤에서 실제 클라이언트 IP를 신뢰할 수 있게 한다(allowlist 필수는 config.Validate가 보장).
+		TrustProxy:       cfg.TrustProxy,
+		TrustProxyConfig: fiber.TrustProxyConfig{Proxies: cfg.TrustProxyProxies},
+		ProxyHeader:      cfg.TrustProxyHeader,
 	})
 
 	// 순서가 계약이다: requestid(상관관계) → recover → 보안헤더 → cors → rate limit

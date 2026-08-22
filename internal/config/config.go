@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -25,6 +26,12 @@ const (
 	DBDriverSQLite   DBDriver = "sqlite"
 )
 
+// 데모 자격증명 기본값. prod에서 이 값이 남아 있으면 시작을 거부한다(Validate 판정용).
+const (
+	DefaultDemoUsername = "admin"
+	DefaultDemoPassword = "admin123"
+)
+
 type Config struct {
 	AppName  string `env:"APP_NAME" envDefault:"go-fiber-starter"`
 	Env      Env    `env:"APP_ENV" envDefault:"local"`
@@ -41,6 +48,11 @@ type Config struct {
 
 	CORSAllowedOrigins []string `env:"CORS_ALLOWED_ORIGINS" envSeparator:"," envDefault:"*"`
 	RateLimitPerMinute int      `env:"RATE_LIMIT_PER_MINUTE" envDefault:"120"`
+
+	// 역프록시 뒤에서만 TRUST_PROXY=true로 켠다. 헤더 위조 방지를 위해 신뢰 프록시 목록이 필요하다.
+	TrustProxy        bool     `env:"TRUST_PROXY" envDefault:"false"`
+	TrustProxyProxies []string `env:"TRUST_PROXY_PROXIES" envSeparator:","`
+	TrustProxyHeader  string   `env:"TRUST_PROXY_HEADER" envDefault:"X-Forwarded-For"`
 
 	ReadTimeout  time.Duration `env:"HTTP_READ_TIMEOUT" envDefault:"15s"`
 	WriteTimeout time.Duration `env:"HTTP_WRITE_TIMEOUT" envDefault:"15s"`
@@ -113,12 +125,34 @@ func (c *Config) Validate() error {
 	if c.RateLimitPerMinute < 1 {
 		addf("RATE_LIMIT_PER_MINUTE must be >= 1, got %d", c.RateLimitPerMinute)
 	}
+	if c.TrustProxy && len(c.TrustProxyProxies) == 0 {
+		addf("TRUST_PROXY_PROXIES must not be empty when TRUST_PROXY=true " +
+			"(an allowlist is required to prevent header spoofing)")
+	}
+	for _, p := range c.TrustProxyProxies {
+		if net.ParseIP(p) == nil {
+			if _, _, err := net.ParseCIDR(p); err != nil {
+				addf("TRUST_PROXY_PROXIES entry %q is not a valid IP or CIDR", p)
+			}
+		}
+	}
+	if c.TrustProxy && c.TrustProxyHeader == "" {
+		addf("TRUST_PROXY_HEADER must not be empty when TRUST_PROXY=true")
+	}
+	if !c.TrustProxy && len(c.TrustProxyProxies) > 0 {
+		addf("TRUST_PROXY_PROXIES must not be set when TRUST_PROXY=false (ineffective configuration)")
+	}
 	if c.AuthEnabled {
 		if len(c.AuthJWTSecret) < 32 {
 			addf("AUTH_JWT_SECRET must be >= 32 bytes when AUTH_ENABLED=true (got %d bytes)", len(c.AuthJWTSecret))
 		}
 		if c.AuthTokenTTL <= 0 {
 			addf("AUTH_TOKEN_TTL must be positive, got %s", c.AuthTokenTTL)
+		}
+		if c.Env == EnvProd &&
+			(c.AuthDemoUsername == DefaultDemoUsername || c.AuthDemoPassword == DefaultDemoPassword) {
+			addf("AUTH_DEMO_USERNAME/AUTH_DEMO_PASSWORD defaults are forbidden when APP_ENV=prod " +
+				"(set explicit credentials or replace the demo authenticator)")
 		}
 	}
 	for _, d := range []struct {
