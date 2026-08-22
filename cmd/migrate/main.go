@@ -11,7 +11,6 @@ package main
 
 import (
 	"fmt"
-	"io/fs"
 	"log/slog"
 	"os"
 	"strconv"
@@ -43,7 +42,7 @@ func run(args []string) error {
 		return fmt.Errorf("sqlite does not use SQL migrations; DB_AUTO_MIGRATE=true handles schema in dev")
 	}
 
-	sub, err := fs.Sub(migrations.FS, "db/migrations/"+string(cfg.DBDriver))
+	sub, err := migrations.DriverFS(string(cfg.DBDriver))
 	if err != nil {
 		return fmt.Errorf("locate migrations for %s: %w", cfg.DBDriver, err)
 	}
