@@ -1,0 +1,12 @@
+root = true
+
+[build]
+cmd = "go build -o ./tmp/api ./cmd/api"
+full_bin = "./tmp/api"
+include_ext = ["go", "toml", "env"]
+exclude_dir = ["tmp", "data", "bin", ".git"]
+include_dir = ["cmd", "internal", "db"]
+delay = 1000
+
+[log]
+time = true

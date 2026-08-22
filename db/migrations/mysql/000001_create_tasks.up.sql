@@ -1,0 +1,12 @@
+CREATE TABLE IF NOT EXISTS tasks (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    title      VARCHAR(200) NOT NULL,
+    done       TINYINT(1)   NOT NULL DEFAULT 0,
+    due_date   TIMESTAMP    NULL,
+    created_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMP    NULL
+) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4;
+
+CREATE INDEX idx_tasks_deleted_at ON tasks (deleted_at);
+CREATE INDEX idx_tasks_done ON tasks (done);

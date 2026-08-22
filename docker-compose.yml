@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: starter
+      POSTGRES_PASSWORD: starter
+      POSTGRES_DB: starter
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U starter -d starter"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  mysql:
+    image: mysql:9
+    profiles: [mysql]
+    environment:
+      MYSQL_ROOT_PASSWORD: starter
+      MYSQL_DATABASE: starter
+      MYSQL_USER: starter
+      MYSQL_PASSWORD: starter
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+
+  # 전체 스택 실행: docker compose --profile full up -d --build
+  app:
+    build: .
+    profiles: [full]
+    environment:
+      APP_ENV: dev
+      APP_PORT: "8080"
+      DB_DRIVER: postgres
+      DB_DSN: postgres://starter:starter@postgres:5432/starter?sslmode=disable
+      DB_AUTO_MIGRATE: "false" # prod 계열 드라이버는 SQL 마이그레이션 필수
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:
+  mysqldata:

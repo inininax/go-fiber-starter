@@ -1,0 +1,199 @@
+# go-fiber-starter
+
+Go 최신 버전 + **Fiber v3** + **GORM** 기반 REST API 보일러플레이트.
+클론 후 명령어 한 번으로 실행되고, 정해진 패턴을 복사해 모듈을 확장하는 스타터 템플릿이다.
+
+- **즉시 실행**: DB 설치 없이 sqlite로 `make run`
+- **프로덕션 경로**: postgres/mysql + 버전 기반 SQL 마이그레이션(`cmd/migrate`)
+- **관찰 가능성**: slog JSON 로그(request_id 상관관계), `/livez` `/readyz` 분리, Prometheus `/metrics`
+- **보안 기본 장착**: helmet, CORS, rate limit, body limit, 서버 타임아웃
+- **graceful shutdown**: SIGTERM 시 진행 중 요청 완료 후 종료
+
+## 요구 사항
+
+| 도구 | 버전 | 비고 |
+|---|---|---|
+| Go | 1.25+ | Fiber v3 최소 요구 |
+| Docker(선택) | — | postgres/mysql 실행 시 |
+| air(선택) | latest | 핫 리로드. `make tools` |
+
+## Quickstart (3분)
+
+```bash
+cp .env.example .env   # 기본값 = sqlite 무설치
+make run               # 또는: go run ./cmd/api
+```
+
+```bash
+curl http://localhost:8080/livez   # {"status":"ok"}
+```
+
+핫 리로드 개발:
+
+```bash
+make tools && make dev
+```
+
+postgres로 실행:
+
+```bash
+docker compose up -d postgres
+DB_DRIVER=postgres \
+DB_DSN='postgres://starter:starter@localhost:5432/starter?sslmode=disable' \
+go run ./cmd/api
+```
+
+> postgres/mysql은 prod 계열 드라이버다. `APP_ENV=prod`에서는 `DB_AUTO_MIGRATE=true`가 하드 차단되며
+> SQL 마이그레이션(`make migrate-up`)을 사용해야 한다.
+
+## 환경변수
+
+`.env.example` 참고. 전체 목록과 기본값은 [internal/config/config.go](internal/config/config.go)가 단일 출처이다.
+
+| 변수 | 기본값 | 설명 |
+|---|---|---|
+| `APP_ENV` | `local` | local/dev/prod. prod+sqlite 조합 금지 |
+| `APP_PORT` | `8080` | |
+| `LOG_LEVEL` | `info` | debug에서 SQL 파라미터 로그 출력 |
+| `DB_DRIVER` | `sqlite` | postgres / mysql / sqlite |
+| `DB_DSN` | `data/app.db` | 드라이버별 DSN 형식은 `.env.example` 주석 |
+| `DB_AUTO_MIGRATE` | `true` | prod(pg/mysql)에서 true면 시작 거부 |
+| `CORS_ALLOWED_ORIGINS` | `*` | 콤마 구분 |
+| `RATE_LIMIT_PER_MINUTE` | `120` | IP당 분당 요청 수 |
+
+## API 예제
+
+모든 응답은 공통 엔벨로프를 사용한다.
+
+```json
+// 성공                                  // 실패
+{ "success": true, "data": { ... },       { "success": false,
+  "meta": { ... } }                         "error": { "code": "...", "message": "..." } }
+```
+
+```bash
+BASE=http://localhost:8080/api/v1
+
+# 생성 (201)
+curl -s -X POST $BASE/tasks -H 'Content-Type: application/json' \
+  -d '{"title":"write tests"}'
+
+# 목록 (페이지네이션 meta 포함, limit 최대 100)
+curl -s "$BASE/tasks?page=1&limit=20"
+
+# 단건 (없으면 404 TASK_NOT_FOUND)
+curl -s $BASE/tasks/1
+
+# 부분 수정 (present 필드만 반영)
+curl -s -X PATCH $BASE/tasks/1 -H 'Content-Type: application/json' -d '{"done":true}'
+
+# 삭제 (204, soft delete)
+curl -s -X DELETE $BASE/tasks/1
+
+# 검증 실패 → 422 + 필드별 상세
+curl -s -X POST $BASE/tasks -H 'Content-Type: application/json' -d '{"title":""}'
+```
+
+기타: `GET /readyz`(DB ping), `GET /metrics`(Prometheus).
+
+## 새 모듈 추가 가이드
+
+`task` 모듈이 템플릿이다. 5단계:
+
+1. **복제**: `internal/modules/task/`를 `<name>/`으로 복사한 뒤 model/dto/repo/service/handler/routes를 도메인에 맞게 수정
+2. **인터페이스 위치 유지**: Repository 인터페이스는 service.go(소비자)에 선언 — mock이 자유로워진다
+3. **마이그레이션 등록**:
+   - sqlite(dev): `db/migrations` 불필요, 아래 4번의 AutoMigrate 목록에 모델 추가
+   - postgres/mysql(prod): `db/migrations/{postgres,mysql}/000002_xxx.{up,down}.sql` 작성 (`make migrate-new name=xxx`)
+4. **조립**: `cmd/api/main.go`의 `AutoMigrateIfNeeded(...)` 목록에 모델 추가(sqlite용)
+5. **라우트 마운트**: `internal/router/wiring.go`에 `NewService(NewRepository(db))` 추가,
+   `router.go`에서 `RegisterRoutes(v1, svc)` 한 줄 추가
+
+규칙: `fiber.Ctx`는 handler에만, `*gorm.DB`는 repository에만 노출. 의존성 방향 `handler → service → repository`.
+
+## 트랜잭션 패턴
+
+트랜잭션 경계는 service 계층에 둔다. 다중 저장소 원자성이 필요하면:
+
+```go
+import "go-fiber-starter/internal/database"
+
+func (s *OrderService) Place(ctx context.Context, o Order) error {
+	return database.WithTx(s.db, func(tx *gorm.DB) error {
+		orderRepo := NewOrderRepository(tx)    // tx로 스코프된 repo
+		paymentRepo := payment.NewRepository(tx)
+		if err := orderRepo.Create(ctx, &o); err != nil {
+			return err // 반환하면 롤백
+		}
+		return paymentRepo.Charge(ctx, o.ID)
+	})
+}
+```
+
+## 마이그레이션 워크플로 (postgres/mysql)
+
+```bash
+export DB_DRIVER=postgres
+export DB_DSN='postgres://starter:starter@localhost:5432/starter?sslmode=disable'
+
+make migrate-up      # 미적용 전부 적용
+make migrate-down    # 1스텝 롤백
+go run ./cmd/migrate version     # 현재 버전/더티 상태
+go run ./cmd/migrate force 1     # 더티 수동 복구
+```
+
+SQL 파일은 `embed.FS`로 바이너리에 포함된다. sqlite는 이 흐름 대상이 아니며 AutoMigrate를 쓴다.
+
+## 폴더 구조
+
+```
+cmd/api          진입점(조립 + graceful shutdown)
+cmd/migrate      SQL 마이그레이션 CLI(up/down/version/force)
+internal/
+  config         env 파싱 + fail-fast 검증
+  database       연결/풀/slog 어댑터/AutoMigrate 정책
+  common         에러 카탈로그, 응답 엔벨로프, 페이지네이션
+  middleware     요청 로깅, Prometheus 수집
+  router         fiber 앱 조립, 전역 ErrorHandler
+  modules/task   예제 도메인 = 모듈 템플릿
+  modules/health livez/readyz
+  validator      validate 태그 ↔ Fiber 바인딩 연결
+db/migrations    버전 기반 SQL(postgres, mysql)
+```
+
+## 테스트
+
+```bash
+make test        # 전체 (-race)
+make test-cov    # 커버리지 HTML 리포트
+```
+
+- service 단위 테스트: fake repository 주입(외부 I/O 없음)
+- handler 통합 테스트: 실제 GORM + sqlite 파일(각 테스트 임시 디렉터리) + `app.Test()`
+
+## CI
+
+`.github/workflows/ci.yml`: gofmt 체크 → vet → test(-race, cover) → build.
+Docker 이미지: 멀티스테이지 빌드, non-root, HEALTHCHECK(/livez).
+
+## AI 에이전트 협업 (Codex / Claude / Cursor / opencode 등)
+
+이 저장소는 AI 에이전트 공동 작업을 전제로 문서가 이원화되어 있다.
+**운영 규칙의 단일 출처는 루트 `AGENTS.md` 하나뿐**이며, 나머지는 이를 가리키는 얇은 포인터다.
+
+| 파일 | 역할 | 읽는 주체 |
+|---|---|---|
+| **AGENTS.md** | 명령어, 아키텍처 불변식, Fiber v3 함정, 마이그레이션 정책 등 운영 규칙 | Codex(네이티브), opencode, Cursor, Jules 등 대부분의 최신 에이전트 |
+| `CLAUDE.md` | `@AGENTS.md` 임포트 한 줄 — 규칙 중복 없이 Claude Code 연결 | Claude Code |
+| `.github/copilot-instructions.md` | 핵심 요약 + AGENTS.md 참조 | GitHub Copilot |
+| `PROMPT.md` | 프로젝트 생성 당시 설계 사양(이력 문서) | 사람/에이전트 |
+
+**규칙 변경 시 AGENTS.md만 수정한다.** 새 에이전트 도입 시에도 별도 문서를 만들지 말고
+AGENTS.md를 읽도록 포인터만 추가할 것.
+
+## Roadmap
+
+- JWT 인증 모듈 스캐폴드(golang-jwt/v5, Bearer 추출 미들웨어)
+- OpenAPI 3 스펙 문서화 및 `/docs` 서빙
+- OpenTelemetry tracing(현재 request_id 상관관계까지만 제공)
+- cursor 기반 페이지네이션(대량 테이블용)
