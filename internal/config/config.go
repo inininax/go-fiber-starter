@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"slices"
 	"strings"
 	"time"
 
@@ -48,6 +49,8 @@ type Config struct {
 
 	CORSAllowedOrigins []string `env:"CORS_ALLOWED_ORIGINS" envSeparator:"," envDefault:"*"`
 	RateLimitPerMinute int      `env:"RATE_LIMIT_PER_MINUTE" envDefault:"120"`
+
+	AuthRateLimitPerMinute int `env:"AUTH_RATE_LIMIT_PER_MINUTE" envDefault:"10"`
 
 	// 역프록시 뒤에서만 TRUST_PROXY=true로 켠다. 헤더 위조 방지를 위해 신뢰 프록시 목록이 필요하다.
 	TrustProxy        bool     `env:"TRUST_PROXY" envDefault:"false"`
@@ -124,6 +127,16 @@ func (c *Config) Validate() error {
 	}
 	if c.RateLimitPerMinute < 1 {
 		addf("RATE_LIMIT_PER_MINUTE must be >= 1, got %d", c.RateLimitPerMinute)
+	}
+	if c.IsProd() && slices.Contains(c.CORSAllowedOrigins, "*") {
+		addf(`CORS_ALLOWED_ORIGINS must not contain "*" when APP_ENV=prod (list explicit origins)`)
+	}
+	if c.AuthRateLimitPerMinute < 1 {
+		addf("AUTH_RATE_LIMIT_PER_MINUTE must be >= 1, got %d", c.AuthRateLimitPerMinute)
+	}
+	if c.AuthRateLimitPerMinute > c.RateLimitPerMinute {
+		addf("AUTH_RATE_LIMIT_PER_MINUTE (%d) must be <= RATE_LIMIT_PER_MINUTE (%d); otherwise the global limiter caps it first",
+			c.AuthRateLimitPerMinute, c.RateLimitPerMinute)
 	}
 	if c.TrustProxy && len(c.TrustProxyProxies) == 0 {
 		addf("TRUST_PROXY_PROXIES must not be empty when TRUST_PROXY=true " +

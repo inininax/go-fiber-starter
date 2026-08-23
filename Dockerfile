@@ -11,8 +11,12 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
 	CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /out/migrate ./cmd/migrate
 
 # --- 실행 스테이지 ---
-FROM alpine:3.20
-RUN addgroup -S app && adduser -S app -G app
+# alpine은 LTS가 없고 릴리스마다 ~2년 지원. 마이너 태그 고정으로 보안 패치는 자동 수급.
+# 마이너 bump는 https://endoflife.date/alpine-linux 기준 분기 점검(현재 3.23 → EOL 2027-11).
+# digest 핀은 갱신 자동화 부재 시 역효과라 채택하지 않음.
+FROM alpine:3.23
+RUN addgroup -S app && adduser -S app -G app \
+	&& apk add --no-cache ca-certificates
 WORKDIR /app
 COPY --from=builder /out/api /app/api
 COPY --from=builder /out/migrate /app/migrate

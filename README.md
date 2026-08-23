@@ -58,18 +58,20 @@ go run ./cmd/api
 | `DB_DRIVER` | `sqlite` | postgres / mysql / sqlite |
 | `DB_DSN` | `data/app.db` | 드라이버별 DSN 형식은 `.env.example` 주석 |
 | `DB_AUTO_MIGRATE` | `true` | prod(pg/mysql)에서 true면 시작 거부 |
-| `CORS_ALLOWED_ORIGINS` | `*` | 콤마 구분 |
+| `CORS_ALLOWED_ORIGINS` | `*` | 콤마 구분. prod에서 `*`는 시작 거부 |
 | `RATE_LIMIT_PER_MINUTE` | `120` | IP당 분당 요청 수 |
 | `TRUST_PROXY` | `false` | 역프록시 뒤에서만 true. true면 `TRUST_PROXY_PROXIES` 필수 |
 | `TRUST_PROXY_PROXIES` | — | 신뢰할 프록시 IP/CIDR 목록(콤마 구분). TRUST_PROXY=false인데 설정하면 시작 거부 |
 | `TRUST_PROXY_HEADER` | `X-Forwarded-For` | 클라이언트 IP를 읽을 헤더 |
 | `AUTH_ENABLED` | `false` | true면 로그인 활성화 + `/api/v1/tasks` 전체 Bearer 요구 |
+| `AUTH_RATE_LIMIT_PER_MINUTE` | `10` | 로그인 분당 시도 한도(IP별). 전역 값 이하 |
 | `AUTH_JWT_SECRET` | — | AUTH_ENABLED=true 시 32바이트 이상 필수 |
 | `AUTH_TOKEN_TTL` | `1h` | 액세스 토큰 만료 |
 
 ## 인증 (JWT 스캐폴드)
 
 `AUTH_ENABLED=true`로 실행하면 데모 자격증명(env)으로 JWT를 발급하고 task API가 보호된다.
+로그인 엔드포인트는 IP별 분당 시도 한도(`AUTH_RATE_LIMIT_PER_MINUTE`)로 보호되어 brute force 시도를 429로 거부한다.
 
 ```bash
 AUTH_ENABLED=true AUTH_JWT_SECRET=$(openssl rand -base64 48) go run ./cmd/api

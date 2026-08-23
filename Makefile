@@ -1,5 +1,7 @@
 COMMIT_HASH := $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
 IMAGE_NAME  := go-fiber-starter
+# ci.yml의 GOLANGCI_LINT_VERSION과 일치 필수
+GOLANGCI_LINT_VERSION ?= v2.13.1
 MIGRATE_NEW ?= change_description
 name ?= # 소문자 별칭: make migrate-new name=add_users
 ifneq ($(strip $(name)),)
@@ -45,7 +47,7 @@ tidy: ## 의존성 정리
 
 tools: ## 개발 도구 설치(air, golangci-lint)
 	go install github.com/air-verse/air@latest
-	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@latest
+	go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 docker-up: ## postgres + 앱 컨테이너 기동
 	docker compose up -d --build

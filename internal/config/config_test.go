@@ -10,20 +10,21 @@ import (
 
 func validConfig() *Config {
 	return &Config{
-		AppName:             "test",
-		Env:                 EnvLocal,
-		Port:                8080,
-		LogLevel:            "info",
-		DBDriver:            DBDriverSQLite,
-		DBDSN:               "data/test.db",
-		DBMaxOpenConns:      5,
-		DBMaxIdleConns:      2,
-		CORSAllowedOrigins:  []string{"*"},
-		RateLimitPerMinute:  60,
-		ReadTimeout:         15 * time.Second,
-		WriteTimeout:        15 * time.Second,
-		IdleTimeout:         60 * time.Second,
-		ShutdownGracePeriod: 10 * time.Second,
+		AppName:                "test",
+		Env:                    EnvLocal,
+		Port:                   8080,
+		LogLevel:               "info",
+		DBDriver:               DBDriverSQLite,
+		DBDSN:                  "data/test.db",
+		DBMaxOpenConns:         5,
+		DBMaxIdleConns:         2,
+		CORSAllowedOrigins:     []string{"*"},
+		RateLimitPerMinute:     60,
+		AuthRateLimitPerMinute: 10,
+		ReadTimeout:            15 * time.Second,
+		WriteTimeout:           15 * time.Second,
+		IdleTimeout:            60 * time.Second,
+		ShutdownGracePeriod:    10 * time.Second,
 	}
 }
 
@@ -57,6 +58,28 @@ func TestValidate_ProdSQLiteRejected(t *testing.T) {
 
 	if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "prod") {
 		t.Fatalf("expected prod+sqlite rejection, got %v", err)
+	}
+}
+
+func TestValidate_ProdWildcardCORSRejected(t *testing.T) {
+	cfg := validConfig()
+	cfg.Env = EnvProd
+	cfg.DBDriver = DBDriverPostgres
+
+	err := cfg.Validate()
+	if err == nil || !strings.Contains(err.Error(), "CORS_ALLOWED_ORIGINS") {
+		t.Fatalf("expected prod wildcard CORS rejection, got %v", err)
+	}
+}
+
+func TestValidate_ProdExplicitCORSOriginsAccepted(t *testing.T) {
+	cfg := validConfig()
+	cfg.Env = EnvProd
+	cfg.DBDriver = DBDriverPostgres
+	cfg.CORSAllowedOrigins = []string{"https://app.example.com"}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("expected explicit CORS origins accepted in prod, got %v", err)
 	}
 }
 
@@ -110,6 +133,7 @@ func TestValidate_ProdExplicitDemoCredentialsAccepted(t *testing.T) {
 	cfg := validConfig()
 	cfg.Env = EnvProd
 	cfg.DBDriver = DBDriverPostgres
+	cfg.CORSAllowedOrigins = []string{"https://app.example.com"}
 	cfg.AuthEnabled = true
 	cfg.AuthJWTSecret = strings.Repeat("x", 32)
 	cfg.AuthTokenTTL = time.Hour

@@ -29,6 +29,10 @@ import (
 
 const bodyLimit = 1 << 20 // 1 MiB
 
+// ErrRateLimited는 429 응답의 단일 출처이다. limiter LimitReached와 mapFiberError가
+// 이를 공유해 어느 경로로 거부되든 동일한 엔벨로프(error.code=RATE_LIMITED)를 보장한다.
+var ErrRateLimited = &apperror.AppError{Code: "RATE_LIMITED", Status: http.StatusTooManyRequests, Message: "too many requests"}
+
 // New는 fiber 앱을 생성하고 미들웨어 체인/라우트/에러 처리를 조립한다.
 func New(cfg *config.Config, db *gorm.DB, log *slog.Logger, reg *prometheus.Registry) *fiber.App {
 	app := fiber.New(fiber.Config{
@@ -55,6 +59,7 @@ func New(cfg *config.Config, db *gorm.DB, log *slog.Logger, reg *prometheus.Regi
 		Max:               cfg.RateLimitPerMinute,
 		Expiration:        time.Minute,
 		LimiterMiddleware: limiter.SlidingWindow{},
+		LimitReached:      func(c fiber.Ctx) error { return ErrRateLimited },
 	}))
 	prom := appmw.NewPrometheus(reg)
 	app.Use(prom.Handler())
@@ -70,9 +75,18 @@ func New(cfg *config.Config, db *gorm.DB, log *slog.Logger, reg *prometheus.Regi
 	var taskGuard []fiber.Handler
 	if cfg.AuthEnabled {
 		authSvc := auth.NewService(auth.NewDemoAuthenticator(cfg), cfg.AuthJWTSecret, cfg.AuthTokenTTL)
-		auth.RegisterRoutes(v1, authSvc) // 로그인은 가드 밖
+		// 로그인은 전역 가드 밖에서 자체 예산(IP별 분당)으로 보호한다 — brute force 차단.
+		loginGuard := limiter.New(limiter.Config{
+			Max:               cfg.AuthRateLimitPerMinute,
+			Expiration:        time.Minute,
+			LimiterMiddleware: limiter.SlidingWindow{},
+			LimitReached:      func(c fiber.Ctx) error { return ErrRateLimited },
+		})
+		auth.RegisterRoutes(v1, authSvc, loginGuard) // 로그인은 task 가드 밖
 		taskGuard = []fiber.Handler{auth.RequireAuth(authSvc)}
-		log.Info("auth enabled", "protected", "/api/v1/tasks")
+		log.Info("auth enabled",
+			"protected", "/api/v1/tasks",
+			"login_rate_limit_per_minute", cfg.AuthRateLimitPerMinute)
 	}
 	task.RegisterRoutes(v1, taskService(db), taskGuard...)
 
@@ -112,7 +126,7 @@ func mapFiberError(fe *fiber.Error) *apperror.AppError {
 	case fiber.StatusNotFound:
 		return apperror.ErrNotFound.WithCause(fe)
 	case fiber.StatusTooManyRequests:
-		return &apperror.AppError{Code: "RATE_LIMITED", Status: fe.Code, Message: "too many requests"}
+		return ErrRateLimited.WithCause(fe)
 	case fiber.StatusRequestEntityTooLarge:
 		return &apperror.AppError{Code: "PAYLOAD_TOO_LARGE", Status: fe.Code, Message: "request body too large"}
 	default:

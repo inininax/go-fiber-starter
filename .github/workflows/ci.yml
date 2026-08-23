@@ -11,10 +11,12 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      GOLANGCI_LINT_VERSION: v2.13.1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
@@ -26,6 +28,11 @@ jobs:
             echo "포맷 필요: $unformatted"
             exit 1
           fi
+
+      - name: lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
 
       - name: vet
         run: go vet ./...
@@ -69,9 +76,9 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true

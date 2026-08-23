@@ -38,7 +38,7 @@ func (d *demoAuthenticator) Verify(_ context.Context, username, password string)
 	// 타이밍 공격 방지를 위해 constant-time 비교. 단락 평가를 피하려고 두 비교를 모두 수행한다.
 	userOK := subtle.ConstantTimeCompare([]byte(username), []byte(d.username)) == 1
 	passOK := subtle.ConstantTimeCompare([]byte(password), []byte(d.password)) == 1
-	if !(userOK && passOK) {
+	if !userOK || !passOK {
 		return Identity{}, apperror.ErrInvalidCredential
 	}
 	return Identity{Username: username}, nil

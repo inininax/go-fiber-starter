@@ -59,7 +59,12 @@ func run(args []string) error {
 	if err != nil {
 		return fmt.Errorf("init migrator: %w", err)
 	}
-	defer m.Close()
+	defer func() {
+		srcErr, dbErr := m.Close() // Close는 소스/DB 각각의 에러를 반환한다
+		if srcErr != nil || dbErr != nil {
+			fmt.Fprintf(os.Stderr, "close migrator: source=%v database=%v\n", srcErr, dbErr)
+		}
+	}()
 
 	if len(args) == 0 {
 		return fmt.Errorf("usage: migrate up|down|version|force <n>")

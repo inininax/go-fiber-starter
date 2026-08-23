@@ -31,8 +31,9 @@ func New(ctx context.Context, cfg *config.Config, logger *Logger) (*gorm.DB, err
 			return nil, err
 		}
 		// 파일 경로의 부모 디렉터리가 없으면 sqlite 오픈이 실패한다(클론 직후 실행 대응).
+		// sqlite 파일은 dev 전용 로컬 데이터다. 타 사용자 traversal 차단을 위해 디렉터리만 0o700로 충분하다.
 		if dir := filepath.Dir(abs); dir != "" && dir != "." {
-			if err := os.MkdirAll(dir, 0o755); err != nil {
+			if err := os.MkdirAll(dir, 0o700); err != nil {
 				return nil, fmt.Errorf("create sqlite directory: %w", err)
 			}
 		}

@@ -56,7 +56,7 @@ func (r *gormRepository) List(ctx context.Context, q pagination.PageQuery) ([]Ta
 // applyRowLock은 SELECT에 행 잠금(FOR UPDATE)을 걸어 읽기-수정-쓰기 경쟁을 직렬화한다.
 // sqlite는 FOR UPDATE 구문을 파싱하지 못해 오류이므로, dev 전용 단일 인스턴스 전제로 제외한다.
 func applyRowLock(tx *gorm.DB) *gorm.DB {
-	if tx.Dialector.Name() == "sqlite" {
+	if tx.Name() == "sqlite" {
 		return tx
 	}
 	return tx.Clauses(clause.Locking{Strength: clause.LockingStrengthUpdate})
