@@ -1,0 +1,36 @@
+# 기여 가이드
+
+이 저장소는 AI 에이전트와 사람이 공동 작업하는 것을 전제로 한다. 기여 전 반드시
+[AGENTS.md](AGENTS.md)(운영 규칙 단일 출처)를 읽을 것.
+
+## 개발 워크플로
+
+1. 이슈 또는 디스커션으로 의도 공유(사소한 문서 수정은 생략 가능)
+2. `main`에서 토픽 브랜치 생성: `feat/xxx`, `fix/xxx`, `docs/xxx`
+3. 변경 + 아래 검증 세트 통과
+4. PR 생성 — CI(gofmt/vet/lint/test+coverage gate/migrations/build)가 모두 녹색이어야 머지
+
+### 커밋 전 필수 검증 세트
+
+```bash
+gofmt -w . && go vet ./... && go test ./... -race -count=1
+```
+
+CI는 `gofmt -l` 빈 출력과 커버리지 65% 하한을 강제한다.
+
+## 규칙 요약 (상세는 AGENTS.md)
+
+- 계층: `handler → service → repository → model`. 역방향 참조 금지.
+- 새 도메인은 [internal/modules/task](internal/modules/task/)를 복제하고
+  [.agents/rules/new-module-checklist.md](.agents/rules/new-module-checklist.md) 체크리스트를 따른다.
+- 마이그레이션 이원화: sqlite=AutoMigrate(dev), postgres/mysql prod=`cmd/migrate` SQL 버전 관리 — 둘 다 작성.
+- 응답/에러는 `httpx.Envelope` / `apperror.AppError` 카탈로그로 통일. 도메인 센티널은 모듈 errors.go에.
+- API 변경 시 `api/openapi.yaml` 동기화(드리프트 테스트가 CI에서 검증함).
+
+## 커밋 메시지
+
+`feat|fix|refactor|docs|chore: 한국어 요약` 형식을 사용하며, 본문에 동기와 검증 방법을 남긴다.
+
+## 보안 취약점
+
+[SECURITY.md](SECURITY.md)의 비공개 보고 경로를 사용할 것. 공개 Issue 금지.

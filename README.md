@@ -1,5 +1,8 @@
 # go-fiber-starter
 
+[![CI](https://github.com/inininax/go-fiber-starter/actions/workflows/ci.yml/badge.svg)](https://github.com/inininax/go-fiber-starter/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Go 최신 버전 + **Fiber v3** + **GORM** 기반 REST API 보일러플레이트.
 클론 후 명령어 한 번으로 실행되고, 정해진 패턴을 복사해 모듈을 확장하는 스타터 템플릿이다.
 
@@ -245,3 +248,15 @@ Docker 이미지: 멀티스테이지 빌드, non-root, HEALTHCHECK(/livez).
 - OpenTelemetry tracing(현재 request_id 상관관계까지만 제공)
 - cursor 기반 페이지네이션(대량 테이블용)
 - compress / ETag 미들웨어
+
+## 기여
+
+[CONTRIBUTING.md](CONTRIBUTING.md) 참고. 운영 규칙의 단일 출처는 [AGENTS.md](AGENTS.md)다.
+
+## 변경 이력
+
+[CHANGELOG.md](CHANGELOG.md).
+
+## 라이선스
+
+[LICENSE](LICENSE) — MIT

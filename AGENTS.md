@@ -81,3 +81,4 @@ docker compose up -d postgres                 # postgres 기동(mysql은 --profi
 - 주석은 "왜"만 설명. 자명한 코드 주석 금지.
 - context는 `c.Context()`로 꺼내 service/repository까지 전파. 버림 금지.
 - 페이지네이션 limit은 `pagination.MaxLimit`(100)으로 클램프 — count 비용 방어.
+- 사용자 관점의 주요 변경(feat/fix/breaking)은 CHANGELOG.md의 Unreleased 섹션에 한 줄 추가.
