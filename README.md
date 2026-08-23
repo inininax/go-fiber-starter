@@ -76,6 +76,11 @@ go run ./cmd/api
 `AUTH_ENABLED=true`로 실행하면 데모 자격증명(env)으로 JWT를 발급하고 task API가 보호된다.
 로그인 엔드포인트는 IP별 분당 시도 한도(`AUTH_RATE_LIMIT_PER_MINUTE`)로 보호되어 brute force 시도를 429로 거부한다.
 
+> ⚠️ **다중 replica 주의**: rate limiter는 인메모리 상태라 인스턴스별로 예산이 분할된다.
+> 수평 확장 배포에서는 Redis 기반 limiter 등 외부화가 필요하다(Roadmap 참고).
+> 또한 `TRUST_PROXY=false` 상태의 프록시 뒤 배포는 전 사용자가 프록시 IP 하나로 묶여 집단 429가 발생한다 —
+> 프록시 뒤에서는 반드시 `TRUST_PROXY=true` + 신뢰 프록시 목록을 설정할 것.
+
 ```bash
 AUTH_ENABLED=true AUTH_JWT_SECRET=$(openssl rand -base64 48) go run ./cmd/api
 
@@ -211,10 +216,14 @@ db/migrations    버전 기반 SQL(postgres, mysql)
 ```bash
 make test        # 전체 (-race)
 make test-cov    # 커버리지 HTML 리포트
+make smoke       # 실제 DB 대상 E2E 스모크(docker compose postgres 필요)
+go test ./internal/modules/task/ -bench BenchmarkTasksList -benchtime 5x   # 벤치마크
 ```
 
 - service 단위 테스트: fake repository 주입(외부 I/O 없음)
 - handler 통합 테스트: 실제 GORM + sqlite 파일(각 테스트 임시 디렉터리) + `app.Test()`
+- E2E 스모크(`scripts/smoke.sh`): 실제 DB에서 마이그레이션→부팅→livez commit 노출→CRUD 전 주기 검증. CI가 pg/mysql 각각 실행
+- 벤치마크: task 핸들러 목록/생성 경로 추적, 퍼즈 타깃(parseID/stripScheme) 포함
 - CI는 `-coverpkg=./...` 계량식으로 전체 커버리지를 측정하고, 65%(환경변수 `COVERAGE_MIN`) 미만이면 실패한다
 
 ## CI
@@ -248,6 +257,7 @@ Docker 이미지: 멀티스테이지 빌드, non-root, HEALTHCHECK(/livez).
 - OpenTelemetry tracing(현재 request_id 상관관계까지만 제공)
 - cursor 기반 페이지네이션(대량 테이블용)
 - compress / ETag 미들웨어
+- 분산 rate limiter(Redis 등) — 다중 replica 배포 시 필요, 현재는 인메모리(위 "인증" 섹션 주의 참고)
 
 ## 기여
 

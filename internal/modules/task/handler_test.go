@@ -18,16 +18,17 @@ import (
 )
 
 // newTestApp은 실제 GORM(sqlite 파일) + 실제 라우트를 갖춘 통합 테스트용 앱을 만든다.
-func newTestApp(t *testing.T) *fiber.App {
-	t.Helper()
+// TB 인터페이스로 테스트(T)와 벤치마크(B) 모두 지원한다.
+func newTestApp(tb testing.TB) *fiber.App {
+	tb.Helper()
 
-	dsn := filepath.Join(t.TempDir(), "test.db")
+	dsn := filepath.Join(tb.TempDir(), "test.db")
 	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
+		tb.Fatalf("open sqlite: %v", err)
 	}
 	if err := db.AutoMigrate(&Task{}); err != nil {
-		t.Fatalf("migrate: %v", err)
+		tb.Fatalf("migrate: %v", err)
 	}
 
 	app := fiber.New(fiber.Config{

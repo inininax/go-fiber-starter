@@ -1,0 +1,40 @@
+# goreleaser v2 설정 — 태그 push 시 바이너리 릴리스를 자동 생성한다.
+# 로컬 검증: goreleaser check && goreleaser build --snapshot --clean
+version: 2
+
+project_name: go-fiber-starter
+
+builds:
+  - id: api
+    main: ./cmd/api
+    binary: api
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.commit={{.Tag}}
+  - id: migrate
+    main: ./cmd/migrate
+    binary: migrate
+    env: [CGO_ENABLED=0]
+    goos: [linux, darwin]
+    goarch: [amd64, arm64]
+
+archives:
+  - formats: [tar.gz]
+    name_template: >-
+      {{ .ProjectName }}_{{ .Tag }}_{{ title .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: git
+  filters:
+    exclude:
+      - "^docs:"
+      - "^chore:"
+      - "^test:"

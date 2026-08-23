@@ -5,9 +5,18 @@
 
 ## [Unreleased]
 
+### Added
+
+- 릴리스 자동화: `.goreleaser.yaml` + 태그 push 시 테스트→바이너리 릴리스 워크플로우
+- E2E 스모크(`scripts/smoke.sh`, CI `smoke` 잡): pg/mysql 실제 DB에서 부팅→CRUD 전 주기 검증
+- 벤치마크(task 목록/생성)와 퍼즈 타깃(parseID, stripScheme)
+- `apperror`/`httpx`/`pagination` 순수 패키지 직접 단위 테스트
+
 ### Changed
 
 - GitHub Actions 의존성 갱신: checkout@v7, setup-go@v7, golangci-lint-action@v9 (dependabot)
+- CI에 concurrency 취소 설정(같은 브랜치 연속 push 시 구 run 자동 취소)
+- README에 다중 replica rate limiter 한계 및 TRUST_PROXY 배포 주의사항 문서화
 
 ## [0.3.0] - 2026-08-23
 

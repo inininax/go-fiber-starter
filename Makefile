@@ -55,6 +55,9 @@ docker-up: ## postgres + 앱 컨테이너 기동
 docker-down: ## 컨테이너 중지/제거
 	docker compose down -v
 
+smoke: ## 실제 DB 대상 E2E 스모크 (compose postgres 기동 필요)
+	./scripts/smoke.sh postgres 'postgres://starter:starter@localhost:5432/starter?sslmode=disable' 8090
+
 migrate-up: ## SQL 마이그레이션 적용 (DB_DRIVER/DB_DSN 환경변수 사용)
 	DB_AUTO_MIGRATE=false go run ./cmd/migrate up
 
