@@ -39,6 +39,8 @@ func run() error {
 		"commit", commit,
 		"app", cfg.AppName, "env", cfg.Env, "port", cfg.Port, "db_driver", cfg.DBDriver,
 	)
+	// 빌드 식별자를 Config로 주입해 router 이하가 cfg만 의존하게 한다(시그니처 무변경).
+	cfg.BuildCommit = commit
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

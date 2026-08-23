@@ -25,7 +25,7 @@ make run               # 또는: go run ./cmd/api
 ```
 
 ```bash
-curl http://localhost:8080/livez   # {"status":"ok"}
+curl http://localhost:8080/livez   # {"status":"ok","commit":"..."}
 ```
 
 핫 리로드 개발:
@@ -133,7 +133,7 @@ curl -s -X DELETE $BASE/tasks/1
 curl -s -X POST $BASE/tasks -H 'Content-Type: application/json' -d '{"title":""}'
 ```
 
-기타: `GET /readyz`(DB ping), `GET /metrics`(Prometheus).
+기타: `GET /readyz`(DB ping), `GET /metrics`(Prometheus), `GET /openapi.yaml`(OpenAPI 3.0.3 스펙).
 
 ## 새 모듈 추가 가이드
 
@@ -212,10 +212,11 @@ make test-cov    # 커버리지 HTML 리포트
 
 - service 단위 테스트: fake repository 주입(외부 I/O 없음)
 - handler 통합 테스트: 실제 GORM + sqlite 파일(각 테스트 임시 디렉터리) + `app.Test()`
+- CI는 `-coverpkg=./...` 계량식으로 전체 커버리지를 측정하고, 65%(환경변수 `COVERAGE_MIN`) 미만이면 실패한다
 
 ## CI
 
-`.github/workflows/ci.yml`: gofmt 체크 → vet → test(-race, cover) → build.
+`.github/workflows/ci.yml`: gofmt 체크 → vet → test(-race, cover) → coverage gate → build.
 Docker 이미지: 멀티스테이지 빌드, non-root, HEALTHCHECK(/livez).
 
 ## AI 에이전트 협업 (Codex / Claude / Cursor / opencode 등)
@@ -239,7 +240,8 @@ Docker 이미지: 멀티스테이지 빌드, non-root, HEALTHCHECK(/livez).
 
 ## Roadmap
 
-- ~~JWT 인증 모듈 스캐폴드(golang-jwt/v5, Bearer 추출 미들웨어)~~ → 구현 완료(위 "인증" 섹션). 남은 과제: DB 기반 Authenticator 교체
-- OpenAPI 3 스펙 문서화 및 `/docs` 서빙
+- ~~JWT 인증 모듈 스캐폴드(golang-jwt/v5, Bearer 추출 미들웨어)~~ → 구현 완료(위 "인증" 섹션). 남은 과제: DB 기반 Authenticator 교체([스케치 문서](docs/authenticator-sketch.md))
+- ~~OpenAPI 3 스펙 문서화~~ → 구현 완료(`api/openapi.yaml`, `GET /openapi.yaml` 서빙, 드리프트 테스트 `internal/router/openapi_test.go`). 남은 과제: Swagger UI `/docs` 서빙
 - OpenTelemetry tracing(현재 request_id 상관관계까지만 제공)
 - cursor 기반 페이지네이션(대량 테이블용)
+- compress / ETag 미들웨어

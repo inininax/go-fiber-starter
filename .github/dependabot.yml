@@ -1,0 +1,26 @@
+version: 2
+
+updates:
+  # Go 모듈: minor+patch를 하나의 PR로 묶어 갱신 소음을 줄인다.
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    open-pull-requests-limit: 5
+
+  # GitHub Actions: 워크플로 내 actions/* 버전 갱신.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+    open-pull-requests-limit: 5

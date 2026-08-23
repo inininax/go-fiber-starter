@@ -37,8 +37,22 @@ jobs:
       - name: vet
         run: go vet ./...
 
+      # Makefile test-cov와 동일 계량식(-coverpkg=./...)으로 커버리지를 측정한다.
       - name: test
-        run: go test ./... -race -coverprofile=coverage.out
+        run: go test ./... -race -count=1 -coverpkg=./... -coverprofile=coverage.out
+
+      # 실측 기준(초기 67.7%) 여유의 하한선 — 수치는 주석 없이 COVERAGE_MIN으로만 관리. 하락 추세를 막는 게이트이며 상향은 실측 개선 후 조정.
+      - name: coverage gate
+        env:
+          COVERAGE_MIN: '65'
+        run: |
+          total=$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+          below=$(awk -v t="$total" -v m="$COVERAGE_MIN" 'BEGIN {print (t < m) ? 1 : 0}')
+          echo "coverage total=${total}% (min=${COVERAGE_MIN}%)"
+          if [ "$below" = "1" ]; then
+            echo "::error::커버리지 ${total}%가 임계값 ${COVERAGE_MIN}% 미만입니다"
+            exit 1
+          fi
 
       - name: build
         run: CGO_ENABLED=0 go build ./...

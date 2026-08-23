@@ -18,6 +18,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"gorm.io/gorm"
 
+	"go-fiber-starter/api"
 	"go-fiber-starter/internal/apperror"
 	"go-fiber-starter/internal/config"
 	"go-fiber-starter/internal/httpx"
@@ -28,6 +29,22 @@ import (
 )
 
 const bodyLimit = 1 << 20 // 1 MiB
+
+// limiterSkipPaths는 전역 rate limit 예산을 소모하지 않는 운영 경로다.
+// k8s 프로브와 스크래퍼가 임계값을 소진해 실제 API 트래픽을 429로 밀어내는 것을 방지한다.
+var limiterSkipPaths = map[string]struct{}{
+	"/livez":        {},
+	"/readyz":       {},
+	"/metrics":      {},
+	"/openapi.yaml": {},
+}
+
+// skipRateLimit은 정확히 일치하는 경로만 전역 limiter에서 제외한다.
+// c.Path()는 쿼리 문자열이 제거된 경로라 쿼리 우회 변형이 없다.
+func skipRateLimit(c fiber.Ctx) bool {
+	_, ok := limiterSkipPaths[c.Path()]
+	return ok
+}
 
 // ErrRateLimited는 429 응답의 단일 출처이다. limiter LimitReached와 mapFiberError가
 // 이를 공유해 어느 경로로 거부되든 동일한 엔벨로프(error.code=RATE_LIMITED)를 보장한다.
@@ -60,15 +77,18 @@ func New(cfg *config.Config, db *gorm.DB, log *slog.Logger, reg *prometheus.Regi
 		Expiration:        time.Minute,
 		LimiterMiddleware: limiter.SlidingWindow{},
 		LimitReached:      func(c fiber.Ctx) error { return ErrRateLimited },
+		// 프로브/메트릭/스펙 경로는 예산 밖. 로그인 전용 guard에는 적용하지 않는다(별도 예산).
+		Next: skipRateLimit,
 	}))
 	prom := appmw.NewPrometheus(reg)
 	app.Use(prom.Handler())
 	app.Use(appmw.RequestLogger(log))
 
-	h := health.NewHandler(func() error { return pingDB(db) })
+	h := health.NewHandler(func() error { return pingDB(db) }, cfg.BuildCommit)
 	app.Get("/livez", h.Livez)
 	app.Get("/readyz", h.Readyz)
 	app.Get("/metrics", adaptor.HTTPHandler(promhttp.HandlerFor(reg, promhttp.HandlerOpts{})))
+	app.Get("/openapi.yaml", openapiSpecHandler)
 
 	v1 := app.Group("/api/v1")
 
@@ -91,6 +111,19 @@ func New(cfg *config.Config, db *gorm.DB, log *slog.Logger, reg *prometheus.Regi
 	task.RegisterRoutes(v1, taskService(db), taskGuard...)
 
 	return app
+}
+
+// openapiSpecHandler는 embed된 api/openapi.yaml을 그대로 응답한다.
+// 정적 파일 서빙 설정 없이 단일 파일 응답이면 충분하다.
+// 참고: fiber v3의 c.Type(ext, charset...)은 두 번째 인자가 charset이라 MIME 지정 용도가 아니어서
+// Content-Type을 직접 설정한다(GetMIME에 yaml이 없어 시스템 의존 결과를 피함).
+func openapiSpecHandler(c fiber.Ctx) error {
+	yaml, err := api.FS.ReadFile("openapi.yaml")
+	if err != nil {
+		return fmt.Errorf("read embedded openapi.yaml: %w", err)
+	}
+	c.Set(fiber.HeaderContentType, "application/yaml; charset=utf-8")
+	return c.Send(yaml)
 }
 
 // errorHandler는 모든 에러를 통일 엔벨로프로 변환한다.

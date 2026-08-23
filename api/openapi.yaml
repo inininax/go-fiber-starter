@@ -1,0 +1,472 @@
+# go-fiber-starter 공개 API 스펙.
+# 코드와의 일치는 internal/router/openapi_test.go(드리프트 테스트)가 강제한다:
+# 라우트 추가/제거 시 이 파일을 함께 갱신하지 않으면 CI가 실패한다.
+openapi: 3.0.3
+
+info:
+  title: go-fiber-starter API
+  description: Go + Fiber v3 + GORM 기반 REST API 보일러플레이트. 성공/실패 모두 공통 Envelope로 응답한다(/livez /readyz /metrics 등 운영 프로브 제외).
+  version: 1.0.0
+
+servers:
+  - url: /
+
+paths:
+  /livez:
+    get:
+      summary: Liveness 프로브
+      description: 프로세스 생존 확인. DB 장애와 무관하다.
+      operationId: livez
+      tags: [system]
+      responses:
+        '200':
+          description: 프로세스 생존
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LivezResponse'
+  /readyz:
+    get:
+      summary: Readiness 프로브
+      description: DB ping 포함 의존성 준비 상태를 확인한다.
+      operationId: readyz
+      tags: [system]
+      responses:
+        '200':
+          description: 트래픽 수신 가능
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyzResponse'
+        '503':
+          description: 의존성(DB) 준비 안 됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadyzResponse'
+  /metrics:
+    get:
+      summary: Prometheus 메트릭
+      operationId: metrics
+      tags: [system]
+      responses:
+        '200':
+          description: Prometheus text exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+  /openapi.yaml:
+    get:
+      summary: 이 스펙 문서
+      operationId: openapiYaml
+      tags: [system]
+      responses:
+        '200':
+          description: OpenAPI 3.0.3 YAML 원문
+          content:
+            application/yaml:
+              schema:
+                type: string
+
+  /api/v1/auth/login:
+    post:
+      summary: 로그인(JWT 발급)
+      description: AUTH_ENABLED=true일 때만 활성화된다. IP별 분당 시도 한도 초과 시 429 RATE_LIMITED.
+      operationId: login
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 발급 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginEnvelope'
+        '400':
+          description: 본문 파싱 실패(malformed request body)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '401':
+          description: 자격증명 불일치(INVALID_CREDENTIALS)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: 필드 검증 실패(INVALID_REQUEST, details에 필드별 사유)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: 로그인 시도 한도 초과(RATE_LIMITED, IP별 AUTH_RATE_LIMIT_PER_MINUTE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/tasks:
+    post:
+      summary: Task 생성
+      operationId: createTask
+      tags: [tasks]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTaskRequest'
+      responses:
+        '201':
+          description: 생성됨
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        '400':
+          description: 본문 파싱 실패(malformed request body)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: 필드 검증 실패(INVALID_REQUEST, details에 필드별 사유)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '429':
+          description: 전역 rate limit 초과(RATE_LIMITED, IP별 RATE_LIMIT_PER_MINUTE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    get:
+      summary: Task 목록(offset 페이지네이션)
+      operationId: listTasks
+      tags: [tasks]
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: 페이지 번호(1 이상, 기본 1)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          required: false
+          description: 페이지 크기(1~100, 기본 20, 100 초과분은 클램프)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: 목록과 페이지 메타
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskListEnvelope'
+        '429':
+          description: 전역 rate limit 초과(RATE_LIMITED, IP별 RATE_LIMIT_PER_MINUTE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+  /api/v1/tasks/{id}:
+    get:
+      summary: Task 단건 조회
+      operationId: getTask
+      tags: [tasks]
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        '404':
+          description: 존재하지 않는 task(TASK_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    patch:
+      summary: Task 부분 수정(present-field만 반영)
+      description: 전달한 필드만 변경한다. due_date에 null을 보내면 해제, 미전달이면 무시.
+      operationId: updateTask
+      tags: [tasks]
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTaskRequest'
+      responses:
+        '200':
+          description: 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskEnvelope'
+        '400':
+          description: 본문 파싱 실패 또는 잘못된 id
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '404':
+          description: 존재하지 않는 task(TASK_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          description: 필드 검증 실패(INVALID_REQUEST, details에 필드별 사유)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+    delete:
+      summary: Task 삭제(soft delete)
+      operationId: deleteTask
+      tags: [tasks]
+      parameters:
+        - $ref: '#/components/parameters/TaskID'
+      responses:
+        '204':
+          description: 삭제됨(본문 없음)
+        '404':
+          description: 존재하지 않는 task(TASK_NOT_FOUND)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+
+components:
+  parameters:
+    TaskID:
+      name: id
+      in: path
+      required: true
+      description: Task 식별자(양의 정수)
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+
+  schemas:
+    # === 공통 엔벨로프(httpx.Envelope) ===
+    # 필드 순서는 encoding/json 직렬화 순서(success → data → error → meta)와 일치시킨다.
+    Envelope:
+      type: object
+      description: 모든 API 응답의 공통 래퍼. success/data/error/meta 중 해당하는 것만 직렬화된다.
+      required: [success]
+      properties:
+        success:
+          type: boolean
+        data:
+          description: 성공 시 페이로드. 스키마는 각 응답별 Envelope 참조.
+        error:
+          $ref: '#/components/schemas/Error'
+        meta:
+          description: '부가 정보(예: PageMeta). 스키마는 각 응답별 Envelope 참조.'
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: 안정적인 에러 식별자. 예 NOT_FOUND, INVALID_REQUEST, TASK_NOT_FOUND, INVALID_CREDENTIALS, RATE_LIMITED
+        message:
+          type: string
+        details:
+          type: array
+          description: 필드별 상세(주로 422 검증 실패). validator ValidationErrors의 Field/ActualTag에서 온다.
+          items:
+            $ref: '#/components/schemas/ErrorDetail'
+    ErrorDetail:
+      type: object
+      required: [field, reason]
+      properties:
+        field:
+          type: string
+        reason:
+          type: string
+          description: 위반한 validate 태그(예 required, min, max)
+
+    TaskEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/TaskResponse'
+    TaskListEnvelope:
+      type: object
+      required: [success, data, meta]
+      properties:
+        success:
+          type: boolean
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/TaskResponse'
+        meta:
+          $ref: '#/components/schemas/PageMeta'
+    LoginEnvelope:
+      type: object
+      required: [success, data]
+      properties:
+        success:
+          type: boolean
+        data:
+          $ref: '#/components/schemas/LoginResponse'
+    ErrorEnvelope:
+      type: object
+      required: [success, error]
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          $ref: '#/components/schemas/Error'
+
+    # === Task(task.dto) ===
+    CreateTaskRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+    UpdateTaskRequest:
+      type: object
+      description: 모든 필드 선택적. 전달한 필드만 반영하며 due_date는 null로 명시 해제한다.
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        done:
+          type: boolean
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+    TaskResponse:
+      type: object
+      required: [id, title, done, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+        done:
+          type: boolean
+        due_date:
+          type: string
+          format: date-time
+          nullable: true
+          description: 마감일. 미설정 시 필드가 생략된다(omitempty).
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    # === 페이지네이션(pagination.PageMeta) ===
+    PageMeta:
+      type: object
+      required: [page, limit, total_count, total_pages]
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total_count:
+          type: integer
+          format: int64
+        total_pages:
+          type: integer
+          format: int64
+
+    # === 인증(auth.handler) ===
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    LoginResponse:
+      type: object
+      required: [token, token_type, expires_at]
+      properties:
+        token:
+          type: string
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_at:
+          type: string
+          format: date-time
+
+    # === 프로브(비-엔벨로프) ===
+    LivezResponse:
+      type: object
+      required: [status, commit]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        commit:
+          type: string
+          description: 빌드 시 -ldflags로 주입된 커밋 식별자(미주입 시 dev)
+    ReadyzResponse:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [ready, unavailable]
+        checks:
+          type: object
+          required: [database]
+          properties:
+            database:
+              type: string
+              enum: [up, down]
+
+tags:
+  - name: system
+    description: 프로브/메트릭/스펙
+  - name: auth
+    description: JWT 로그인
+  - name: tasks
+    description: 예제 도메인

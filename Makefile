@@ -25,7 +25,7 @@ test: ## 전체 테스트 (-race)
 	go test ./... -race -count=1
 
 test-cov: ## 커버리지 리포트 생성 (coverage.html)
-	go test ./... -coverprofile=coverage.out
+	go test ./... -race -count=1 -coverpkg=./... -coverprofile=coverage.out
 	go tool cover -html=coverage.out -o coverage.html
 	@go tool cover -func=coverage.out | tail -1
 

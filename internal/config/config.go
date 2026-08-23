@@ -68,6 +68,10 @@ type Config struct {
 	AuthTokenTTL     time.Duration `env:"AUTH_TOKEN_TTL" envDefault:"1h"`
 	AuthDemoUsername string        `env:"AUTH_DEMO_USERNAME" envDefault:"admin"`
 	AuthDemoPassword string        `env:"AUTH_DEMO_PASSWORD" envDefault:"admin123"`
+
+	// BuildCommit은 환경변수가 아니라 main.run에서 -ldflags로 주입된 빌드 식별자다.
+	// env:"-"는 caarlos0/env의 파싱 제외 태그다.
+	BuildCommit string `env:"-"`
 }
 
 // Load는 .env(선택)와 환경변수를 읽어 Config를 구성하고, 규칙 위반 시 모든 오류를 모아 반환한다.
