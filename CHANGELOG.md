@@ -20,8 +20,10 @@
 
 ## [0.3.0] - 2026-08-23
 
-### Added
+### Changed
 
+- 패키지 구조 개편: `internal/common` 해체 → `apperror`/`httpx`/`pagination`/`testutil`
+  분할(GitHub 인기 Go 프로젝트 패턴 준거), task 도메인 에러 모듈 귀환
 - `.github/dependabot.yml` — go modules + github-actions 주간 갱신(minor/patch 그룹핑)
 - OpenAPI 3.0.3 스펙(`api/openapi.yaml`) + `GET /openapi.yaml` 서빙 + 라우트 드리프트 검증 테스트
 - livez 응답에 빌드 commit 노출(`Config.BuildCommit`, `dev` 폴백)
