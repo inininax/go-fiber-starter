@@ -61,8 +61,13 @@ func (s *Service) Update(ctx context.Context, id uint, req UpdateRequest) (Respo
 		if req.Done != nil {
 			t.Done = *req.Done
 		}
-		if req.DueDate != nil {
-			t.DueDate = *req.DueDate // **time.Time: null 해제/값 변경 모두 지원
+		if req.DueDate.Set {
+			if req.DueDate.Null {
+				t.DueDate = nil // 명시적 null = 해제
+			} else {
+				v := req.DueDate.Value
+				t.DueDate = &v
+			}
 		}
 	}
 	t, err := s.repo.Update(ctx, id, mutate)

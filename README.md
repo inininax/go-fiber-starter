@@ -16,7 +16,7 @@ Go 최신 버전 + **Fiber v3** + **GORM** 기반 REST API 보일러플레이트
 
 | 도구 | 버전 | 비고 |
 |---|---|---|
-| Go | 1.25+ | Fiber v3 최소 요구 |
+| Go | 1.27+ | Fiber v3 최소 요구 |
 | Docker(선택) | — | postgres/mysql 실행 시 |
 | air(선택) | latest | 핫 리로드. `make tools` |
 

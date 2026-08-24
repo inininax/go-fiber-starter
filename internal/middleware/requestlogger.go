@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"log/slog"
-	"time"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/gofiber/fiber/v3/middleware/requestid"
@@ -12,7 +11,7 @@ import (
 // requestid 미들웨어가 선행 실행되어야 상관관계 ID가 포함된다.
 func RequestLogger(log *slog.Logger) fiber.Handler {
 	return func(c fiber.Ctx) error {
-		start := time.Now()
+		start := timeNow()
 
 		err := c.Next()
 
@@ -22,7 +21,7 @@ func RequestLogger(log *slog.Logger) fiber.Handler {
 			"method", c.Method(),
 			"path", c.Path(),
 			"status", status,
-			"latency_ms", float64(time.Since(start).Microseconds()) / 1000,
+			"latency_ms", float64(timeSince(start).Microseconds()) / 1000,
 			"ip", c.IP(),
 		}
 		if reqID != "" {

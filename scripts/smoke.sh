@@ -13,15 +13,21 @@ BASE="http://127.0.0.1:${PORT}"
 command -v go > /dev/null || { echo "go required"; exit 1; }
 curl --version > /dev/null || { echo "curl required"; exit 1; }
 
+# 포트 선점은 readyz 폴링 실패로만 알 수 있어 원인 파악이 늦는다 — 시작 전에 즉시 거부.
+if curl -s --max-time 1 "http://127.0.0.1:${PORT}" > /dev/null 2>&1; then
+  echo "port ${PORT} already in use — choose another port"; exit 1
+fi
+
 echo "[smoke] driver=${DRIVER} port=${PORT}"
 
 # 1. 빌드 + 마이그레이션 (prod 계열 경로를 그대로 밟는다)
 export DB_DRIVER="${DRIVER}" DB_DSN="${DSN}" DB_AUTO_MIGRATE=false APP_PORT="${PORT}"
-go build -o /tmp/smoke-api ./cmd/api
+BIN="/tmp/smoke-api-$$"   # $$ 접미사로 병렬 실행 충돌 방지
+go build -o "${BIN}" ./cmd/api
 go run ./cmd/migrate up
 
 # 2. 앱 부팅 + readyz 폴링(최대 15초)
-/tmp/smoke-api > /tmp/smoke-api.log 2>&1 &
+"${BIN}" > "/tmp/smoke-api-$$.log" 2>&1 &
 APP_PID=$!
 trap 'kill ${APP_PID} 2>/dev/null || true' EXIT
 
@@ -29,7 +35,7 @@ for _ in $(seq 1 30); do
   if curl -fsS "${BASE}/readyz" > /dev/null 2>&1; then break; fi
   sleep 0.5
 done
-curl -fsS "${BASE}/readyz" > /dev/null || { echo "readyz failed"; tail /tmp/smoke-api.log; exit 1; }
+curl -fsS "${BASE}/readyz" > /dev/null || { echo "readyz failed"; tail "/tmp/smoke-api-$$.log"; exit 1; }
 
 fail() { echo "FAIL: $1"; exit 1; }
 

@@ -3,6 +3,7 @@ package router
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 	"github.com/prometheus/client_golang/prometheus"
 
+	"go-fiber-starter/internal/apperror"
 	"go-fiber-starter/internal/config"
 	"go-fiber-starter/internal/database"
 	"go-fiber-starter/internal/modules/task"
@@ -186,5 +188,59 @@ func TestAuthDisabled_LoginRouteAbsent(t *testing.T) {
 		`{"username":"admin","password":"admin123"}`, "")
 	if resp.StatusCode != http.StatusNotFound {
 		t.Fatalf("auth disabled: want 404 for login route, got %d", resp.StatusCode)
+	}
+}
+
+// ErrorHandler의 ≥500 분기는 "내부 메시지 노출 금지" 계약이다.
+func TestErrorHandler_InternalErrorMasked(t *testing.T) {
+	app := newTestApp(t, newTestConfig(t))
+	app.Get("/__boom", func(c fiber.Ctx) error {
+		return errors.New("secret internal detail: password=hunter2")
+	})
+
+	resp, env := testutil.Do(t, app, http.MethodGet, "/__boom", "", "")
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Fatalf("want 500, got %d", resp.StatusCode)
+	}
+	if env.Error == nil || env.Error.Code != apperror.CodeInternal {
+		t.Fatalf("expected INTERNAL_ERROR code, got %+v", env.Error)
+	}
+	if strings.Contains(env.Error.Message, "hunter2") {
+		t.Fatalf("internal message leaked: %+v", env.Error)
+	}
+}
+
+func TestMapFiberError_Branches(t *testing.T) {
+	cases := []struct {
+		name     string
+		status   int
+		wantCode string
+	}{
+		{"payloadTooLarge", fiber.StatusRequestEntityTooLarge, "PAYLOAD_TOO_LARGE"},
+		{"teapotDefault", fiber.StatusTeapot, "HTTP_418"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			app := newTestApp(t, newTestConfig(t))
+			app.Get("/__fe", func(c fiber.Ctx) error {
+				return fiber.NewError(tc.status, "detail")
+			})
+			req := httptest.NewRequest(http.MethodGet, "/__fe", nil)
+			resp, err := app.Test(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != tc.status {
+				t.Fatalf("want %d, got %d", tc.status, resp.StatusCode)
+			}
+			var m map[string]any
+			if err := json.NewDecoder(resp.Body).Decode(&m); err != nil {
+				t.Fatal(err)
+			}
+			errObj, _ := m["error"].(map[string]any)
+			if errObj == nil || errObj["code"] != tc.wantCode {
+				t.Fatalf("expected %q, got %+v", tc.wantCode, m["error"])
+			}
+		})
 	}
 }

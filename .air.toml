@@ -3,9 +3,9 @@ root = true
 [build]
 cmd = "go build -o ./tmp/api ./cmd/api"
 full_bin = "./tmp/api"
-include_ext = ["go", "toml", "env"]
+include_ext = ["go", "toml", "env", "yaml", "yml"]
 exclude_dir = ["tmp", "data", "bin", ".git"]
-include_dir = ["cmd", "internal", "db"]
+include_dir = ["cmd", "internal", "db", "api"]
 delay = 1000
 
 [log]

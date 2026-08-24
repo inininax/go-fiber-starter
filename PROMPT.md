@@ -5,7 +5,8 @@
 > 보안 미들웨어, Fiber v3 API 가이드(v2 혼입 방지), 설정 fail-fast 검증, 에러 카탈로그, 테스트 전략 추가.
 >
 > **참고**: 프로젝트 생성 이후의 일상 운영 규칙은 루트 `AGENTS.md`가 단일 출처이다.
-> 이 파일은 초기 설계 사양(이력 문서)으로 유지된다.
+> 이 파일은 초기 설계 사양(이력 문서)으로 유지된다. Fiber v3 API 세부 사항이 본문과
+> AGENTS.md에서 다르면 **AGENTS.md가 우선**이다(본문은 작성 시점 기준).
 
 ---
 
@@ -125,7 +126,7 @@ requestid → recover → helmet(보안헤더) → cors(설정 기반) → rate 
 ```
 - 라우트: `GET /livez`(프로세스 생존, DB 조회 없음) / `GET /readyz`(DB ping, 의존성 준비 확인) /
   `GET /metrics`(Prometheus) / `/api/v1/tasks` CRUD / 정의되지 않은 경로는 통일 에러 포맷 404.
-- fiber.Config: `BodyLimit: 1MB`, ReadTimeout/WriteTimeout/IdleTimeout은 ListenConfig로 설정(각 15s/15s/60s).
+- fiber.Config: `BodyLimit: 1MB`, ReadTimeout/WriteTimeout/IdleTimeout은 fiber.Config로 설정(각 15s/15s/60s).
 
 ### 5.5 응답/에러 포맷 + 에러 카탈로그
 ```json
@@ -176,7 +177,7 @@ requestid → recover → helmet(보안헤더) → cors(설정 기반) → rate 
 ### 5.9 코드 컨벤션
 - 패키지 소문자 단수, 파일 snake_case. 주석은 "왜"만. magic number 금지(상수화).
 - 에러는 `%w` 래핑, 센티널 에러 비교는 `errors.Is`.
-- 컨텍스트: handler에서 `c.Request().Context()` → service → repository 전파. 컨텍스트 버림 금지.
+- 컨텍스트: handler에서 `c.Context()` → service → repository 전파. 컨텍스트 버림 금지.
 
 ## 6. 완료 조건 (Definition of Done)
 1. `make run` → `curl :8080/livez`=200, `readyz`=200(DB ping), `/metrics` 응답.

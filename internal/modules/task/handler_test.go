@@ -173,3 +173,28 @@ func TestHandler_BadIDParam_400(t *testing.T) {
 		t.Fatalf("want 400, got %d (%+v)", resp.StatusCode, env)
 	}
 }
+
+// due_date는 **time.Time으로 null 해제를 지원한다 — 이 계약의 유일한 검증이다.
+func TestHandler_Update_DueDateNullClears(t *testing.T) {
+	app := newTestApp(t)
+	_, createdEnv := testutil.Do(t, app, http.MethodPost, "/api/v1/tasks",
+		`{"title":"with due","due_date":"2030-01-02T03:04:05Z"}`, "")
+	var created Response
+	_ = json.Unmarshal(createdEnv.Data, &created)
+	if created.DueDate == nil {
+		t.Fatal("seed must carry due_date")
+	}
+
+	url := fmt.Sprintf("/api/v1/tasks/%d", created.ID)
+	resp, env := testutil.Do(t, app, http.MethodPatch, url, `{"due_date":null}`, "")
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("want 200, got %d (%+v)", resp.StatusCode, env)
+	}
+	var data Response
+	if err := json.Unmarshal(env.Data, &data); err != nil {
+		t.Fatal(err)
+	}
+	if data.DueDate != nil {
+		t.Fatalf("due_date must be cleared by explicit null: %+v", data.DueDate)
+	}
+}

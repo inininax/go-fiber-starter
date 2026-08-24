@@ -7,6 +7,22 @@
 
 ### Added
 
+- `docs/architecture.md` — 요청 생명주기·계층 경계·스키마 정책 한 장 정리
+- OpenAPI 스펙 보강: securitySchemes(Bearer), tasks 401 응답, 대표 요청/응답 examples
+- GitHub 표준 파일: 이슈 템플릿, PR 템플릿(검증 체크리스트), CODEOWNERS
+- 순수 패키지 외 잔여 테스트: migrator prod 차단 규칙, GORM slog 어댑터, health readyz 503,
+  ErrorHandler 500 마스킹 계약, mapFiberError 분기, validator 직접 테이블, config Load+미커버 규칙,
+  due_date 명시적 null 해제
+
+### Fixed
+
+- `.github/copilot-instructions.md` 깨진 심링크(`../AGENTS.md`로 수정) — Copilot이 규칙을 읽지 못하던 결함
+- PATCH `due_date` 명시적 null 해제가 동작하지 않던 버그(**time.Time null/미전달 구분 불가 → NullableTime 도입)
+- CI와 docker-compose의 DB 버전 불일치(pg 17-alpine, mysql 9로 정렬)
+- `.cursor/rules/project.mdc`의 삭제된 common 패키지 참조, README Go 버전 표기(1.27+) 등 문서 드리프트
+
+### Added
+
 - 릴리스 자동화: `.goreleaser.yaml` + 태그 push 시 테스트→바이너리 릴리스 워크플로우
 - E2E 스모크(`scripts/smoke.sh`, CI `smoke` 잡): pg/mysql 실제 DB에서 부팅→CRUD 전 주기 검증
 - 벤치마크(task 목록/생성)와 퍼즈 타깃(parseID, stripScheme)
@@ -14,7 +30,7 @@
 
 ### Changed
 
-- GitHub Actions 의존성 갱신: checkout@v7, setup-go@v7, golangci-lint-action@v9 (dependabot)
+- GitHub Actions 의존성 갱신: checkout@v7, setup-go@v7, golangci-lint-action@v7 (dependabot)
 - CI에 concurrency 취소 설정(같은 브랜치 연속 push 시 구 run 자동 취소)
 - README에 다중 replica rate limiter 한계 및 TRUST_PROXY 배포 주의사항 문서화
 

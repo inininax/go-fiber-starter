@@ -9,7 +9,7 @@ MIGRATE_NEW := $(name)
 endif
 
 .DEFAULT_GOAL := help
-.PHONY: help run dev test test-cov lint fmt vet build tidy \
+.PHONY: help run dev smoke tools test test-cov lint fmt vet build tidy \
 	docker-up docker-down migrate-up migrate-down migrate-new
 
 help: ## 사용 가능한 타깃 나열
@@ -64,7 +64,7 @@ migrate-up: ## SQL 마이그레이션 적용 (DB_DRIVER/DB_DSN 환경변수 사�
 migrate-down: ## 직전 버전으로 롤백 (1스텝)
 	DB_AUTO_MIGRATE=false go run ./cmd/migrate down
 
-migrate-new: ## 새 마이그레이션 파일 쌍 생성, 버전 자동 계정 (name=snake_case 설명)
+migrate-new: ## 새 마이그레이션 파일 쌍 생성, 버전 자동 계산 (name=snake_case 설명)
 	@if [ -z "$(MIGRATE_NEW)" ]; then echo "사용법: make migrate-new name=add_users"; exit 1; fi
 	@mkdir -p db/migrations/postgres db/migrations/mysql
 	@VER=$$(ls db/migrations/postgres 2>/dev/null | grep -oE '^[0-9]+' | sort -n | tail -1); \

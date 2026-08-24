@@ -51,7 +51,7 @@ func (p *Prometheus) Handler() fiber.Handler {
 		}
 		status := strconv.Itoa(EffectiveStatus(c, err))
 		p.requestsTotal.WithLabelValues(c.Method(), route, status).Inc()
-		p.duration.WithLabelValues(c.Method(), route).Observe(timeSince(start))
+		p.duration.WithLabelValues(c.Method(), route).Observe(timeSince(start).Seconds())
 		return err
 	}
 }

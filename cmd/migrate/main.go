@@ -10,6 +10,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -118,7 +119,7 @@ func migrateURL(cfg *config.Config) (string, error) {
 }
 
 func isNoChange(err error) bool {
-	return err == migrate.ErrNoChange
+	return errors.Is(err, migrate.ErrNoChange)
 }
 
 func stripScheme(dsn string) string {

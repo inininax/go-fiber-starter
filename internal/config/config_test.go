@@ -4,8 +4,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"go-fiber-starter/internal/pagination"
 )
 
 func validConfig() *Config {
@@ -200,16 +198,56 @@ func TestValidate_TrustProxyRules(t *testing.T) {
 	}
 }
 
-func TestNewPageQuery_ClampsLimit(t *testing.T) {
-	q := pagination.NewPageQuery(0, 500)
-	if q.Page != pagination.DefaultPage || q.Limit != pagination.MaxLimit {
-		t.Fatalf("want page=%d limit=%d, got %+v", pagination.DefaultPage, pagination.MaxLimit, q)
+func TestLoad_EnvParsingError_FailsFast(t *testing.T) {
+	t.Setenv("APP_PORT", "not-a-number")
+	if _, err := Load(); err == nil {
+		t.Fatal("invalid APP_PORT must fail at parse stage")
 	}
 }
 
-func TestNewPageMeta_TotalPages(t *testing.T) {
-	meta := pagination.NewPageMeta(pagination.PageQuery{Page: 2, Limit: 20}, 45)
-	if meta.TotalPages != 3 {
-		t.Fatalf("want 3 total pages, got %d", meta.TotalPages)
-	}
+func TestValidate_UncoveredRules(t *testing.T) {
+	t.Run("emptyAppName", func(t *testing.T) {
+		cfg := validConfig()
+		cfg.AppName = ""
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "APP_NAME") {
+			t.Fatalf("expected APP_NAME rejection, got %v", err)
+		}
+	})
+	t.Run("invalidLogLevel", func(t *testing.T) {
+		cfg := validConfig()
+		cfg.LogLevel = "verbose"
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "LOG_LEVEL") {
+			t.Fatalf("expected LOG_LEVEL rejection, got %v", err)
+		}
+	})
+	t.Run("emptyDSN", func(t *testing.T) {
+		cfg := validConfig()
+		cfg.DBDSN = ""
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "DB_DSN") {
+			t.Fatalf("expected DB_DSN rejection, got %v", err)
+		}
+	})
+	t.Run("maxOpenConnsBelowOne", func(t *testing.T) {
+		cfg := validConfig()
+		cfg.DBMaxOpenConns = 0
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "DB_MAX_OPEN_CONNS") {
+			t.Fatalf("expected max-open rejection, got %v", err)
+		}
+	})
+	t.Run("rateLimitBelowOne", func(t *testing.T) {
+		cfg := validConfig()
+		cfg.RateLimitPerMinute = 0
+		if err := cfg.Validate(); err == nil || !strings.Contains(err.Error(), "RATE_LIMIT_PER_MINUTE") {
+			t.Fatalf("expected rate limit rejection, got %v", err)
+		}
+	})
+	t.Run("nonPositiveTimeouts", func(t *testing.T) {
+		cfg := validConfig()
+		cfg.ReadTimeout = 0
+		cfg.ShutdownGracePeriod = -time.Second
+		err := cfg.Validate()
+		if err == nil || !strings.Contains(err.Error(), "HTTP_READ_TIMEOUT") || !strings.Contains(err.Error(), "SHUTDOWN_GRACE_PERIOD") {
+			t.Fatalf("expected timeout rejections, got %v", err)
+		}
+	})
 }
